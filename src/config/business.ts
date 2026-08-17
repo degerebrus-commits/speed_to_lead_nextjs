@@ -25,6 +25,21 @@ export interface BusinessProfile {
   serviceArea: string;
   /** Alerted when a conversation is escalated. Null when not configured. */
   ownerPhone: string | null;
+  /** The trade, as the assistant describes it. */
+  vertical: string;
+  /** What the visiting engineer is called. */
+  technicianNoun: string;
+  /** Problem categories to qualify against. Empty when not configured. */
+  serviceTypes: string[];
+  /** Hazards that must stop qualification. Empty when not configured. */
+  safetyHazards: string[];
+}
+
+function splitList(raw: string): string[] {
+  return raw
+    .split(",")
+    .map((item) => item.trim())
+    .filter((item) => item.length > 0);
 }
 
 export interface MessageTemplates {
@@ -52,6 +67,10 @@ export function getBusinessProfile(): BusinessProfile {
     hours: env.BUSINESS_HOURS,
     serviceArea: env.SERVICE_AREA.trim(),
     ownerPhone: env.OWNER_PHONE ?? null,
+    vertical: env.BUSINESS_VERTICAL,
+    technicianNoun: env.TECHNICIAN_NOUN,
+    serviceTypes: splitList(env.SERVICE_TYPES),
+    safetyHazards: splitList(env.SAFETY_HAZARDS),
   };
 }
 

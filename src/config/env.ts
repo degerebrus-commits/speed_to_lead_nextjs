@@ -84,6 +84,35 @@ const baseSchema = z.object({
   APPOINTMENT_DURATION_MINUTES: z.coerce.number().int().positive().default(90),
   AVAILABLE_TIME_SLOTS: z.string().default(""),
 
+  // --- Trade / vertical ----------------------------------------------------
+  /** The trade, as the assistant should describe it: HVAC, plumbing, roofing. */
+  BUSINESS_VERTICAL: z.string().min(1).default("home services"),
+  /** What the person who visits is called: technician, plumber, electrician. */
+  TECHNICIAN_NOUN: z.string().min(1).default("technician"),
+  /**
+   * Comma-separated problem categories the assistant should try to identify.
+   * These are what makes the qualification questions specific to the trade.
+   */
+  SERVICE_TYPES: z.string().default(""),
+  /**
+   * Comma-separated hazards that must stop qualification and escalate.
+   * Distinct from EMERGENCY_KEYWORDS: those are matched in code against the
+   * customer's words, these are described to the model in the prompt.
+   */
+  SAFETY_HAZARDS: z.string().default(""),
+
+  // --- Conversation tuning -------------------------------------------------
+  /** Hard cap on an outgoing SMS body. Two segments by default. */
+  SMS_MAX_LENGTH: z.coerce.number().int().positive().default(320),
+  /** How many past turns to send the model. Bounded for cost. */
+  AI_HISTORY_LIMIT: z.coerce.number().int().positive().default(20),
+  AI_MAX_OUTPUT_TOKENS: z.coerce.number().int().positive().default(160),
+  AI_TEMPERATURE: z.coerce.number().min(0).max(2).default(0.4),
+  /** Inbound deliveries older than this are treated as replays. */
+  WEBHOOK_MAX_AGE_MINUTES: z.coerce.number().int().positive().default(5),
+  /** Requests per window allowed on the inbound SMS webhook. */
+  SMS_WEBHOOK_RATE_LIMIT: z.coerce.number().int().positive().default(120),
+
   // --- Safety --------------------------------------------------------------
   /**
    * Comma-separated. Matched in application code rather than left to the model:

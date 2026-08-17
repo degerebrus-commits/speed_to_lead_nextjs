@@ -13,7 +13,7 @@ export interface RateLimitResult {
  * Fixed-window limiter held in process memory.
  *
  * Deliberately not Redis: this system runs as a single deployment for a single
- * HVAC company, so process-local state is sufficient and adding a dependency
+ * service business, so process-local state is sufficient and adding a dependency
  * would buy nothing (STANDARDS.md 50). If the app is ever scaled to multiple
  * instances this must move to shared storage - a limit enforced per-process
  * would let N instances through N times.

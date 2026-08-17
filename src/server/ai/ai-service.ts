@@ -7,18 +7,6 @@ import { createAnthropicProvider } from "./anthropic-provider";
 import { AiProviderError, createOpenAiProvider } from "./openai-provider";
 import { buildSystemPrompt } from "./system-prompt";
 
-/** Keeps replies inside one or two SMS segments. */
-const MAX_OUTPUT_TOKENS = 160;
-
-/** Low but not zero: consistent qualification, without robotic repetition. */
-const TEMPERATURE = 0.4;
-
-/** How much history to send. Enough for context, bounded for cost (STANDARDS.md 46). */
-const HISTORY_LIMIT = 20;
-
-/** Hard cap on what we will send as a single SMS. */
-const MAX_SMS_LENGTH = 320;
-
 let providerOverride: AiProvider | null = null;
 
 /** Test-only. Lets a spec substitute a stub and assert what was sent. */
@@ -59,7 +47,7 @@ export function toChatHistory(messages: Message[]): ChatMessage[] {
  * possible. A model told to be brief usually is; this is the backstop for when
  * it is not.
  */
-export function trimToSmsLength(text: string, maxLength: number = MAX_SMS_LENGTH): string {
+export function trimToSmsLength(text: string, maxLength: number = getEnv().SMS_MAX_LENGTH): string {
   const collapsed = text.replace(/\s+/g, " ").trim();
   if (collapsed.length <= maxLength) return collapsed;
 
@@ -96,8 +84,9 @@ export async function generateQualificationReply(
 ): Promise<QualificationResult> {
   const business = getBusinessProfile();
   const provider = getAiProvider();
+  const env = getEnv();
 
-  const recent = history.slice(-HISTORY_LIMIT);
+  const recent = history.slice(-env.AI_HISTORY_LIMIT);
 
   const messages: ChatMessage[] = [
     { role: "system", content: buildSystemPrompt(business) },
@@ -106,11 +95,11 @@ export async function generateQualificationReply(
 
   const response = await provider.complete({
     messages,
-    maxOutputTokens: MAX_OUTPUT_TOKENS,
-    temperature: TEMPERATURE,
+    maxOutputTokens: env.AI_MAX_OUTPUT_TOKENS,
+    temperature: env.AI_TEMPERATURE,
   });
 
-  const reply = trimToSmsLength(response.text);
+  const reply = trimToSmsLength(response.text, env.SMS_MAX_LENGTH);
 
   logger.info("AI reply generated", {
     provider: response.provider,

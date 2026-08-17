@@ -13,9 +13,6 @@ import {
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 
-/** How old a delivery may be before it is treated as a replay. */
-const MAX_DELIVERY_AGE_MS = 5 * 60 * 1000;
-
 /** Deliveries we accept but take no action on yet. */
 const ACKNOWLEDGED_EVENTS = new Set(["MESSAGE_SENT", "MESSAGE_DELIVERED", "MESSAGE_FAILED"]);
 
@@ -61,7 +58,11 @@ export async function POST(request: Request): Promise<Response> {
   }
 
   pruneRateLimitWindows();
-  const rateLimit = checkRateLimit(`sms-webhook:${ip}`, 120, env.RATE_LIMIT_WINDOW_MS);
+  const rateLimit = checkRateLimit(
+    `sms-webhook:${ip}`,
+    env.SMS_WEBHOOK_RATE_LIMIT,
+    env.RATE_LIMIT_WINDOW_MS,
+  );
   if (!rateLimit.allowed) {
     logger.warn("Inbound SMS webhook rate limited", { ip });
     const response = errorResponse(429, "RATE_LIMITED", "Too many requests.");
@@ -128,7 +129,9 @@ export async function POST(request: Request): Promise<Response> {
     return errorResponse(400, "VALIDATION_FAILED", "Payload is not a valid message event.");
   }
 
-  if (!isWithinFreshnessWindow(parsed.data.timestamp, MAX_DELIVERY_AGE_MS)) {
+  const maxDeliveryAgeMs = env.WEBHOOK_MAX_AGE_MINUTES * 60 * 1000;
+
+  if (!isWithinFreshnessWindow(parsed.data.timestamp, maxDeliveryAgeMs)) {
     logger.warn("Inbound SMS webhook rejected: outside freshness window", {
       timestamp: parsed.data.timestamp,
     });
