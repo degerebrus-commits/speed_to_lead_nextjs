@@ -1,0 +1,102 @@
+// Single-tenant schema: this deployment serves exactly one HVAC company.
+// There is deliberately no Organization model and no organizationId column -
+// see CONTRIBUTING.md for the decision and its consequences.
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+/// Lead lifecycle, per README.md. Phase 1 only ever writes NEW; the remaining
+/// values are declared now because adding an enum value later costs a
+/// migration each, and the lifecycle is already specified.
+enum LeadStatus {
+  NEW
+  CONTACTED
+  ENGAGED
+  QUALIFIED
+  APPOINTMENT_PENDING
+  BOOKED
+  HUMAN_HANDOFF
+  NOT_QUALIFIED
+  LOST
+  CLOSED
+}
+
+model Lead {
+  // cuid rather than an auto-increment integer so the API never exposes a
+  // sequential internal identifier (STANDARDS.md 11).
+  id String @id @default(cuid())
+
+  name           String
+  /// Normalised to E.164 before persisting so the dedupe key is stable
+  /// regardless of how the website form formatted the number.
+  phone          String
+  /// Optional per the PRD - every other intake field is mandatory.
+  email          String?
+  serviceAddress String
+  initialMessage String @db.Text
+
+  status LeadStatus @default(NEW)
+
+  /// sha256(normalisedPhone + ':' + trimmedMessage). Unique so that a retried
+  /// webhook delivery collides at the database rather than racing a SELECT
+  /// that would let both writers through.
+  dedupeKey String @unique
+
+  /// Null until the introductory SMS is confirmed sent. Doubles as the work
+  /// queue for the retry job that arrives with the real SMS provider.
+  introSmsSentAt DateTime?
+
+  /// Set when the customer texts STOP. Consumer SMS opt-out is not optional -
+  /// once set, nothing may text this lead again.
+  smsOptedOutAt DateTime?
+
+  messages Message[]
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([status, createdAt])
+  @@index([phone])
+  @@index([email])
+}
+
+enum MessageDirection {
+  INBOUND
+  OUTBOUND
+}
+
+/// Every SMS in either direction. Gives the conversation its history, and
+/// makes outbound spend countable (STANDARDS.md 27).
+model Message {
+  id String @id @default(cuid())
+
+  /// Null when an inbound message arrives from a number we have no lead for.
+  /// The message is still stored - discarding a real customer's text because
+  /// it does not match a row would be worse than an orphan.
+  leadId String?
+  lead   Lead?   @relation(fields: [leadId], references: [id], onDelete: SetNull)
+
+  direction MessageDirection
+  /// The customer's number in E.164 - sender for inbound, recipient outbound.
+  phone     String
+  body      String @db.Text
+
+  /// Provider-assigned id. Unique so a redelivered webhook collides at the
+  /// database rather than being processed twice (STANDARDS.md 28).
+  providerMessageId String? @unique
+  provider          String
+
+  receivedAt DateTime?
+  sentAt     DateTime?
+  createdAt  DateTime  @default(now())
+
+  @@index([leadId, createdAt])
+  @@index([phone, createdAt])
+  @@index([direction, sentAt])
+}

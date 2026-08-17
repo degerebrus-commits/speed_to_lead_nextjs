@@ -1,0 +1,29 @@
+# Only the database is containerised. The Next.js app runs on the host, so
+# source changes never trigger an image rebuild.
+#
+# Every value is read from the environment with a development default, so a new
+# client deployment overrides credentials and database name without editing
+# this file.
+services:
+  db:
+    image: postgres:${POSTGRES_VERSION:-16}-alpine
+    container_name: ${COMPOSE_PROJECT_NAME:-hvac}_db
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER:-postgres}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-postgres}
+      POSTGRES_DB: ${POSTGRES_DB:-hvac_leads}
+    ports:
+      - "${POSTGRES_PORT:-5432}:5432"
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+      - ./docker/initdb:/docker-entrypoint-initdb.d:ro
+    healthcheck:
+      test:
+        ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-postgres} -d ${POSTGRES_DB:-hvac_leads}"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+volumes:
+  pgdata:

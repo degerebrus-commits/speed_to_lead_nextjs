@@ -1,0 +1,9 @@
+# Normalise line endings so a Windows checkout does not produce whole-file
+# diffs against a Linux CI runner or another developer's machine.
+* text=auto eol=lf
+
+# Binary and generated files git should not try to normalise or diff.
+*.png binary
+*.jpg binary
+*.ico binary
+package-lock.json -diff
