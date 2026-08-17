@@ -13,6 +13,7 @@ the single-tenant decision) and `STANDARDS.md` (engineering rules).
 | 2 — Lead management UI | **Not started** — the app has no pages at all |
 | 3 — SMS outbound | **Done**, verified with a real text on a real handset |
 | 3 — SMS inbound | **Code done and verified over the public URL.** Real device capture blocked — see Blockers |
+| 3 — Retry queue | **Done** — `POST /api/leads/retry-intro-sms` drains leads that never got a first message |
 | 4 — AI qualification | **Done**, verified live on `claude-haiku-4-5` |
 | 5 — Booking | **Not started** — config exists, nothing reads it |
 | 6 — Analytics | **Not started** |
@@ -41,10 +42,9 @@ the single-tenant decision) and `STANDARDS.md` (engineering rules).
 
 ## Outstanding work, in priority order
 
-1. **Retry command for stranded leads.** A lead whose SMS send fails is currently unreachable forever: `introSmsSentAt IS NULL` was designed as the work queue and nothing drains it, and re-posting the same form data returns `duplicate` and skips the send. Small, and it closes a real hole.
-2. **Phase 5 — booking.** Smaller than the PRD assumes: `BOOKING_MODE=fixed` with configured slots means **no Google Calendar is needed for MVP**. Offer slots → take a pick → write an `Appointment` row → send `SMS_BOOKING_CONFIRMATION_TEMPLATE`. Calendar becomes a later swap behind an interface, as with SMS and AI.
-3. **Phases 2 + 6 together.** The lead list, conversation view, and metrics are one screen's worth of work. Doing 6 first would ship a dashboard whose booking-rate, appointment-volume, and completion-rate metrics are structurally zero.
-4. **Amend `STANDARDS.md` §13/§14/§15/§57.3.** They mandate multi-tenancy and OWNER/ADMIN/STAFF roles, which this build deliberately does not have. Left untouched pending permission; until amended the contradiction resurfaces every session.
+1. **Phase 5 — booking.** Smaller than the PRD assumes: `BOOKING_MODE=fixed` with configured slots means **no Google Calendar is needed for MVP**. Offer slots → take a pick → write an `Appointment` row → send `SMS_BOOKING_CONFIRMATION_TEMPLATE`. Calendar becomes a later swap behind an interface, as with SMS and AI.
+2. **Phases 2 + 6 together.** The lead list, conversation view, and metrics are one screen's worth of work. Doing 6 first would ship a dashboard whose booking-rate, appointment-volume, and completion-rate metrics are structurally zero.
+3. **Amend `STANDARDS.md` §13/§14/§15/§57.3.** They mandate multi-tenancy and OWNER/ADMIN/STAFF roles, which this build deliberately does not have. Left untouched pending permission; until amended the contradiction resurfaces every session.
 
 ---
 
