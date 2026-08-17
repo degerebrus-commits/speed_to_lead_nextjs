@@ -60,7 +60,7 @@ const { setAiProviderForTesting } = await import("@/server/ai/ai-service");
 const { randomUUID } = await import("node:crypto");
 
 beforeEach(async () => {
-  await prisma.$executeRawUnsafe('TRUNCATE TABLE "Message", "Lead" RESTART IDENTITY CASCADE');
+  await prisma.$executeRawUnsafe('TRUNCATE TABLE "Appointment", "Message", "Lead" RESTART IDENTITY CASCADE');
   resetRateLimits();
 
   // Default doubles for both outbound paths. A spec that cares installs its

@@ -66,6 +66,8 @@ describe("handleCustomerReply", () => {
     process.env.BUSINESS_OPEN_HOUR = "0";
     process.env.BUSINESS_CLOSE_HOUR = "24";
     process.env.EMERGENCY_KEYWORDS = "no heat,gas smell,carbon monoxide";
+    process.env.BOOKING_MODE = "fixed";
+    process.env.AVAILABLE_TIME_SLOTS = "Mon-Fri 9am,Mon-Fri 11am,Sat 10am";
     process.env.AFTER_HOURS_REPLY_ENABLED = "true";
     resetEnvCache();
 
@@ -164,6 +166,82 @@ describe("handleCustomerReply", () => {
       expect(ai.calls).toBe(0);
       expect(sent).toHaveLength(1);
       expect(sent[0].body).toContain("first thing in the morning");
+    });
+  });
+
+  describe("booking", () => {
+    it("offers numbered slots when the customer asks to book", async () => {
+      const ai = installAi("should not be used");
+      const lead = await seedLead();
+
+      const outcome = await handleCustomerReply(lead, "Can I book someone in?");
+
+      expect(outcome.kind).toBe("slots-offered");
+      expect(ai.calls).toBe(0);
+      expect(sent[0].body).toContain("1) Mon-Fri 9am");
+
+      const updated = await prisma.lead.findUniqueOrThrow({ where: { id: lead.id } });
+      expect(updated.status).toBe("APPOINTMENT_PENDING");
+    });
+
+    it("books the chosen slot and confirms it", async () => {
+      const ai = installAi("should not be used");
+      const lead = await seedLead();
+
+      await handleCustomerReply(lead, "Can I book someone in?");
+      const outcome = await handleCustomerReply(lead, "2");
+
+      expect(outcome.kind).toBe("booked");
+      expect(ai.calls).toBe(0);
+      expect(outcome.reply).toContain("Mon-Fri 11am");
+
+      const appointment = await prisma.appointment.findFirstOrThrow({
+        where: { leadId: lead.id },
+      });
+      expect(appointment.slotLabel).toBe("Mon-Fri 11am");
+      expect(appointment.confirmationSentAt).not.toBeNull();
+
+      const updated = await prisma.lead.findUniqueOrThrow({ where: { id: lead.id } });
+      expect(updated.status).toBe("BOOKED");
+    });
+
+    it("still books outside business hours", async () => {
+      // "Increase after-hours bookings" is a stated product goal, so the
+      // holding message must not intercept somebody trying to book at 2am.
+      const today = new Date().getUTCDay();
+      process.env.BUSINESS_OPEN_DAYS = String(today === 1 ? 2 : 1);
+      process.env.BUSINESS_OPEN_HOUR = "9";
+      process.env.BUSINESS_CLOSE_HOUR = "10";
+      resetEnvCache();
+
+      const lead = await seedLead();
+      installAi("unused");
+
+      const offered = await handleCustomerReply(lead, "I need to schedule a visit");
+      expect(offered.kind).toBe("slots-offered");
+
+      const booked = await handleCustomerReply(lead, "1");
+      expect(booked.kind).toBe("booked");
+    });
+
+    it("falls through to the AI when the message is not about booking", async () => {
+      const ai = installAi("Is it blowing warm air?");
+      const lead = await seedLead();
+
+      const outcome = await handleCustomerReply(lead, "It stopped cooling last night");
+
+      expect(outcome.kind).toBe("ai");
+      expect(ai.calls).toBe(1);
+    });
+
+    it("an emergency still outranks a booking request", async () => {
+      const lead = await seedLead();
+      installAi("unused");
+
+      const outcome = await handleCustomerReply(lead, "gas smell - can you book someone now");
+
+      expect(outcome.kind).toBe("emergency");
+      expect(await prisma.appointment.count()).toBe(0);
     });
   });
 

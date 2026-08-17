@@ -56,7 +56,8 @@ model Lead {
   /// once set, nothing may text this lead again.
   smsOptedOutAt DateTime?
 
-  messages Message[]
+  messages     Message[]
+  appointments Appointment[]
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
@@ -99,4 +100,41 @@ model Message {
   @@index([leadId, createdAt])
   @@index([phone, createdAt])
   @@index([direction, sentAt])
+}
+
+enum AppointmentStatus {
+  PENDING
+  CONFIRMED
+  CANCELLED
+  COMPLETED
+}
+
+/// A booked visit. In fixed-slot mode the slot label is the configured string
+/// the customer chose; a calendar-backed mode later adds real timestamps
+/// without changing how the conversation reaches this point.
+model Appointment {
+  id String @id @default(cuid())
+
+  leadId String
+  lead   Lead   @relation(fields: [leadId], references: [id], onDelete: Cascade)
+
+  /// The configured slot label, exactly as offered to the customer.
+  slotLabel String
+  /// Duration in minutes, captured at booking time - changing the configured
+  /// default later must not silently rewrite appointments already made.
+  durationMinutes Int
+
+  status AppointmentStatus @default(CONFIRMED)
+
+  /// Guards double-booking at the database rather than with a read-then-write.
+  /// Two customers choosing the same slot simultaneously would both pass a
+  /// SELECT; one of them must lose at the unique index instead.
+  slotKey String @unique
+
+  confirmationSentAt DateTime?
+  createdAt          DateTime  @default(now())
+  updatedAt          DateTime  @updatedAt
+
+  @@index([leadId])
+  @@index([status, createdAt])
 }

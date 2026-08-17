@@ -1,7 +1,18 @@
 # Project Status
 
 Snapshot as of **2026-08-17**. Read this with `CONTRIBUTING.md` (conventions and
-the single-tenant decision) and `STANDARDS.md` (engineering rules).
+the single-tenant decision), `MISTAKES.md` (what went wrong here and the rules
+that prevent it), and `STANDARDS.md` (engineering rules).
+
+> **Uncommitted work in the tree.** Phase 5 booking is written and
+> typecheck-clean but was never committed: Docker died before the suite could
+> verify it. It was at 109 passing before the database dropped; the newest
+> booking-flow tests are unverified. Bring Postgres up, run the suite, commit
+> if green.
+
+> **Free disk on C: before doing anything.** It hit 0 bytes and caused most of
+> this session's failures. One command recovers 8.84 GB with no download cost:
+> `Remove-Item "$env:APPDATA\Claudem_bundles\claudevm.bundleootfs.vhdx" -Force`
 
 ---
 

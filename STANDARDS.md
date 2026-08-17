@@ -19,7 +19,6 @@ The goal is to ensure the product remains:
 - Reliable
 - Maintainable
 - Testable
-- Multi-tenant
 - User-friendly
 - AI-safe
 - Production-ready
