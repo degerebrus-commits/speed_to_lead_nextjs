@@ -1,0 +1,223 @@
+# Mistakes
+
+A running record of things I got wrong on this project: broken builds, bad
+calls, and places the user had to correct my approach.
+
+Newest first. Each entry records what happened, why, the fix, and the rule that
+would have prevented it.
+
+Three patterns run through this session and are worth reading as groups rather
+than as isolated incidents: **secrets leaked by printing unmasked output**,
+**suppressed output making a failure look like a success**, and **treating a
+recurring symptom as flakiness instead of finding its cause**.
+
+---
+
+## Called Docker "unstable" for hours instead of checking the disk
+
+**What happened.** Docker's engine returned 500 errors, the Postgres container
+dropped mid-test-run twice, and 79 then 47 tests failed. Each time I diagnosed
+"Docker is flaky", restarted it, and carried on. The actual cause was C: at
+**0 bytes free** — Docker cannot write to a full disk. I only found it when
+asked for a time estimate, because the estimating rule forced a machine check.
+
+**Root cause.** I had measured free disk once, during planning, and never again.
+A resource that changes continuously was treated as a fixed fact. When the same
+failure recurred three times I reached for the familiar explanation instead of
+asking what would produce exactly this pattern.
+
+**The correct fix.** Measured the disk, found `vm_bundles` at 10.91 GB and
+Docker's image at 8.44 GB, and cleared npm cache and Temp to recover 4.1 GB.
+
+**Prevention rule.** A symptom that recurs is not flakiness, it is an
+unexamined cause. And a resource measurement has a shelf life — re-check
+before blaming a tool, not once at the start.
+
+---
+
+## Reported a 0-byte file as a database backup
+
+**What happened.** Before proposing a Docker disk migration that could destroy
+both projects' volumes, I ran `pg_dump ... 2>/dev/null` and announced the
+backup was written. The file was 0 bytes: Docker was down and the dump had
+failed. The stderr redirect hid the error.
+
+**Root cause.** I suppressed the channel that would have told me it failed, then
+reported success based on the command completing.
+
+**The correct fix.** Deleted the empty file, re-ran without the redirect, saw
+the daemon was unreachable, and withdrew the migration recommendation.
+
+**Prevention rule.** Never suppress stderr on an operation whose failure you
+would act on. For a backup specifically, assert the artifact — non-zero size,
+plausible content — because a backup that does not exist is worse than none:
+it converts a known risk into a false sense of safety.
+
+---
+
+## `npm install | tail` reported exit 0 on a failed install
+
+**What happened.** The install died with `ECONNRESET` partway through. The
+harness reported exit code 0, because in a pipeline the exit status is `tail`'s,
+not npm's. I nearly proceeded as though dependencies were installed.
+
+**Root cause.** Piped a command whose exit code I intended to trust.
+
+**The correct fix.** Re-ran redirecting to a file and captured `$?` directly.
+
+**Prevention rule.** If you care about a command's exit code, do not pipe it.
+Same family as the 0-byte backup above: the shell will happily tell you a
+failure succeeded if you ask the wrong thing.
+
+---
+
+## Leaked two secrets by printing unmasked output
+
+**What happened.** Twice. First, diagnosing a malformed `.env` line, my masking
+only applied to lines containing `=` — the broken line had none, so roughly 25
+of 36 characters of the webhook secret printed. Second, I dumped the TextBee
+webhooks API response to show its configuration; the response body includes
+`signingSecret` in plaintext.
+
+**Root cause.** Both times I wrote the mask for the shape of output I expected,
+then printed output of a different shape. The first was a line without `=`; the
+second was a field I had not anticipated being in the response at all.
+
+**The correct fix.** Rotated the secret in both `.env` and the TextBee
+registration, and switched to printing only structure — key names, value
+lengths, match/no-match — rather than values.
+
+**Prevention rule.** Do not mask output, *construct* it. Print key names,
+lengths, and booleans; never pass a whole response or file line through a
+filter and hope the filter covers every case. A regex that has to be right
+about untrusted input will eventually be wrong.
+
+---
+
+## Sent a test message to a phone number I invented
+
+**What happened.** While `SMS_PROVIDER=textbee`, I posted a lead with
+`+639171234567` — a number I made up to demonstrate a validation case. Had the
+gateway been working, it would have texted whoever owns that number and spent
+one of 50 monthly messages.
+
+**Root cause.** I was thinking about the API's response shape and forgot the
+request had a real-world side effect. The provider was live at the time and I
+did not check before firing.
+
+**The correct fix.** Owned it immediately, and afterwards used only numbers
+already in the database or the console provider for demonstrations.
+
+**Prevention rule.** Before any request that can leave the machine, ask what it
+does in the real world if it succeeds. Placeholder data is safe in a validation
+example and dangerous in a live one.
+
+---
+
+## Ordered the booking check so nobody could book after hours
+
+**What happened.** I placed the booking branch after the after-hours branch, so
+a customer texting at 2am asking for a slot received "we'll follow up in the
+morning" instead of an appointment. "Increase after-hours bookings" is one of
+the PRD's stated success metrics.
+
+**Root cause.** I ordered the branches by when I wrote them rather than by what
+each one is for. After-hours exists because open-ended conversation needs a
+human; booking needs nobody.
+
+**The correct fix.** Moved booking ahead of after-hours and added a test that
+books outside business hours.
+
+**Prevention rule.** In a chain of guards, order by authority, not by history.
+Ask what each branch is protecting against, and whether the branch below it is
+genuinely subordinate.
+
+---
+
+## Redacted token counts as if they were credentials
+
+**What happened.** The logger scrubbed any key containing `token`, so
+`inputTokens` and `outputTokens` logged as `[redacted]` — destroying the cost
+visibility that the SMS quota guard depends on.
+
+**Root cause.** A substring match on a word that means two different things.
+
+**The correct fix.** Exact-match rules for real credential keys, plus three
+regression tests: credentials scrubbed, counts preserved, ordinary fields
+untouched.
+
+**Prevention rule.** Redaction that is too broad fails silently and looks like
+success. Test what a filter must *keep*, not only what it must remove.
+
+---
+
+## A test helper clobbered the payload it was supposed to extend
+
+**What happened.** Three opt-out tests failed. The builder spread `...overrides`
+after assembling `data`, so an override of one field replaced the whole object
+and dropped `sender`; the request 400'd before reaching the code under test.
+
+**Root cause.** Spread order.
+
+**The correct fix.** Destructured `data` out and merged it separately.
+
+**Worse than the failures.** A fourth test was *passing* for the wrong reason:
+it asserted "not opted out", which was true because the request never got that
+far. It now asserts a 200 first.
+
+**Prevention rule.** When a test fails, check the tests that still pass. A
+fixture bug that breaks some assertions is usually silently satisfying others.
+
+---
+
+## Left a stale dev server holding the port with cached configuration
+
+**What happened.** A dev server outlived its task wrapper and kept port 3100.
+A new one failed with `EADDRINUSE`, and for a moment I was about to test
+against the old process — which held the *previous* `.env` in memory, including
+a different AI provider.
+
+**Root cause.** Next reads `.env` once at boot and `getEnv()` caches it, so a
+surviving process serves stale configuration indefinitely while looking healthy.
+
+**The correct fix.** Identified the owning PID, stopped it, confirmed the port
+was free, then started fresh.
+
+**Prevention rule.** After any `.env` change, verify *which* process is serving,
+not just that something is. An old server answering with old config is worse
+than no server, because it produces confident wrong results.
+
+---
+
+## Wrote paths that do not exist on Windows
+
+**What happened.** Several commands wrote to `/tmp/...`, which Node resolved to
+`D:\tmp` — a directory that does not exist. Two commands failed outright.
+
+**Root cause.** Reflex from a POSIX environment, in a session where the user had
+explicitly said they are on Windows.
+
+**The correct fix.** Wrote scratch files into the working directory and deleted
+them, or used the session scratchpad.
+
+**Prevention rule.** The user told me the platform. Environment facts stated
+once should change behaviour for the rest of the session, not just the next
+command.
+
+---
+
+## Asked for decisions the user had already delegated
+
+**What happened.** Early on I twice raised structured questions about stack and
+tenancy; both were dismissed. Later the user said plainly: *"I can wait for
+another hour as long as you don't ask me for decision-making."*
+
+**Root cause.** I treated reversible choices — framework, model, file layout —
+as needing sign-off. They were mine to make and state.
+
+**The correct fix.** Made the calls, recorded the reasoning in `CONTRIBUTING.md`
+and commit messages, and reserved questions for things that genuinely could not
+be undone, such as a Docker migration risking another project's data.
+
+**Prevention rule.** Ask only when being wrong would be expensive *and*
+irreversible. Otherwise decide, say what you decided and why, and move.
