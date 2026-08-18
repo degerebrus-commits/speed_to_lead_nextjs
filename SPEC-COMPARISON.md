@@ -1,12 +1,28 @@
 # Our build vs. `speed_to_lead_backend/SPECIFICATION.md`
 
 Comparison of this Next.js implementation against the Express/SQLite backend
-specification on `speed_to_lead_backend@master`, written by luislndch last
-month. Read alongside `PRD-TRACEABILITY.md`.
+specification on `speed_to_lead_backend@master`. Read alongside
+`PRD-TRACEABILITY.md`.
 
-**Both implement the same product from the same PRD.** Neither is a superset of
-the other. This document exists so the choice between them is made on evidence
-rather than on which one is newer.
+**Both are the same author's work, from the same idea, built separately:**
+
+| | `speed_to_lead_backend` | this repo |
+|---|---|---|
+| Built with | Claude.ai chat, Sonnet | Claude Code, Opus |
+| Stack | Express + SQLite | Next.js + Postgres + Prisma |
+| Strength | Specification and design | Tests and verification |
+
+Neither is a superset of the other. Because both are yours, nothing here needs
+negotiating — the only question is which becomes the primary, and what gets
+carried across from the other.
+
+The split in strengths is worth noticing. A chat session produces documents
+well: that spec has UML, data-flow and sequence diagrams and a deployment
+topology, none of which exist here. Claude Code can run what it writes: this
+build has 177 tests against a real Postgres, a security review that found three
+live defects, and behaviour verified over HTTP rather than assumed. Each tool
+produced what it is good at.
+
 
 ---
 
@@ -99,22 +115,30 @@ Worth noting, because independent agreement is evidence:
 
 ## Recommendation
 
-**Do not force-push either over the other.** They are unrelated histories and
-the spec repo contains a collaborator's work.
+**Consolidate on this build, and port three things from the other.**
 
-1. **Keep `nextjs-rebuild` as a branch** — done. Both implementations survive.
-2. **Talk to luislndch before choosing.** They may have context on why the
-   Express version exists, and the specification is a better design document
-   than anything in this repo.
-3. **Take the tool-use idea regardless of which codebase wins.** A
-   `record_qualification` tool closes the biggest functional gap in our build,
-   and it does not require giving the model the power to execute anything.
-4. **Take their deployment section.** We have no Dockerfile and no deployment
-   topology, and Railway is on the critical path.
-5. **They should take our consent, idempotency and opt-out work regardless.**
-   Those are not preferences. Without consent capture the system cannot
-   lawfully send, and without unique constraints a retried webhook doubles both
-   leads and texts.
+This is the one that should go to a client. It has the compliance work without
+which the system cannot lawfully send a single text — consent capture, STOP,
+HELP — none of which appears in the specification. It has idempotency enforced
+by unique constraints rather than a read-then-write. And it has 177 tests, so a
+change can be made without wondering what broke.
 
-The honest summary: **our implementation is more robust, theirs is better
-specified, and each has something the other needs.**
+Carry these across from `speed_to_lead_backend`:
+
+1. **The tool-use idea, in hybrid form.** A `record_qualification` tool the
+   model calls to hand back issue, urgency and address as typed fields. That
+   closes the second-biggest gap in `PRD-TRACEABILITY.md` — qualification is
+   currently discussed and then lost in message text. The model extracts; the
+   code still executes. Do not give it `book_appointment`.
+2. **The deployment section.** Dockerfile, topology, production environment
+   variables. This repo has none, and Railway is on the critical path.
+3. **The Google Calendar design.** Read availability, create, update, cancel.
+   Worth following when fixed slots stop being enough.
+
+Do not force-push either branch over the other. `master` stays as the record of
+the first build; `nextjs-rebuild` carries the second. Merging them is not worth
+it — the histories are unrelated and the overlap is conceptual, not textual.
+
+The honest summary: **this build is more robust, that one is better specified,
+and the specification is worth keeping as a design document even after its code
+stops being the product.**
