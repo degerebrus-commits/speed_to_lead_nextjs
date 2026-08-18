@@ -87,13 +87,23 @@ Send that same string as `smsConsentText`.
 
 ## Fields
 
-| Label | Key | Type | Notes |
-|---|---|---|---|
-| Your name | `name` | text | Required, max 120 |
-| Mobile number | `phone` | tel | Required. Helper text: "The assistant will text this number." |
-| Email | `email` | email | Optional — label it so |
-| Service address | `serviceAddress` | text | Required. Helper: "Anything will do for a demo." |
-| What's the problem? | `message` | textarea, 3 rows | Required, max 2000. Pre-fill: "My AC is running but the house is not getting cool." |
+| Label | Key | Type | Placeholder | Notes |
+|---|---|---|---|---|
+| Your name | `name` | text | `John Carter` | Required, max 120 |
+| Mobile number | `phone` | tel | `+1 512 555 0188` | Required. Helper text: "The assistant will text this number." |
+| Email | `email` | email | `john@example.com` | Optional — label it so |
+| Service address | `serviceAddress` | text | `42 Oak Street, Austin TX` | Required. Helper: "Anything will do for a demo." |
+| What's the problem? | `message` | textarea, 3 rows | — | Required, max 2000. **Pre-filled as a real value**, not a placeholder: "My AC is running but the house is not getting cool." |
+
+**Placeholders are scaffolding, and they earn their place.** A label says what
+the field is; a placeholder shows what a good answer looks like, which is what
+actually removes hesitation. Every field except the message gets one, and none
+of them is ever a real value - an empty field must submit as empty.
+
+The message field is the exception in the other direction: it carries an actual
+pre-filled value. Inventing a plausible HVAC fault is the one thing a visitor
+cannot do quickly, and this is a demo rather than a service request - so that
+work is removed entirely rather than merely guided.
 
 ## Behaviour
 
