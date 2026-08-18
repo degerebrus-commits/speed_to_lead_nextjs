@@ -2,6 +2,7 @@ import Link from "next/link";
 import { notFound } from "next/navigation";
 
 import { formatDateTime, formatLeadStatus, formatTime, leadStatusTone } from "@/lib/format";
+import { requireSession } from "@/server/auth/require-session";
 import { getLeadDetail } from "@/server/leads/lead-queries";
 
 export const dynamic = "force-dynamic";
@@ -19,6 +20,9 @@ export default async function LeadDetailPage({
   params: Promise<{ id: string }>;
 }) {
   const { id } = await params;
+
+  await requireSession(`/leads/${id}`);
+
   const lead = await getLeadDetail(id);
 
   // A mistyped or stale id is a 404, not an error screen - nothing went wrong.

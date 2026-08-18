@@ -25,6 +25,31 @@ const baseSchema = z.object({
   RATE_LIMIT_MAX_REQUESTS: z.coerce.number().int().positive().default(10),
   RATE_LIMIT_WINDOW_MS: z.coerce.number().int().positive().default(60_000),
 
+  /**
+   * Password for the dashboard. One shared password rather than user accounts:
+   * this deployment serves one business, and the dashboard shows every
+   * customer's name, phone, home address and full message history, so it needs
+   * a door - but not a user table, roles, or a password reset flow.
+   *
+   * Optional in the schema so a fresh checkout runs. Unset means the dashboard
+   * refuses to serve at all rather than serving openly: failing closed is the
+   * only safe default for a screen holding this data.
+   */
+  DASHBOARD_PASSWORD: z
+    .string()
+    .min(12, "must be at least 12 characters - generate with: openssl rand -hex 16")
+    .optional(),
+
+  /**
+   * Signing key for the session cookie. Defaults to the dashboard password so
+   * a deployment needs one secret rather than two; set it separately to rotate
+   * sessions without changing the password people type.
+   */
+  DASHBOARD_SESSION_SECRET: z.string().min(16).optional(),
+
+  /** How long a dashboard login lasts. */
+  DASHBOARD_SESSION_HOURS: z.coerce.number().int().positive().default(12),
+
   // --- Per-client values. Everything below differs between deployments. ---
   BUSINESS_NAME: z.string().min(1),
   BUSINESS_COUNTRY_CODE: z

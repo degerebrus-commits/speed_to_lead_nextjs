@@ -2,6 +2,7 @@ import Link from "next/link";
 
 import { formatDateTime, formatDuration } from "@/lib/format";
 import { getDashboardMetrics, getStalledLeads } from "@/server/analytics/metrics-service";
+import { requireSession } from "@/server/auth/require-session";
 
 // Metrics reflect leads arriving continuously; a cached page would show an
 // owner stale numbers and, worse, a stale "waiting for first contact" count.
@@ -26,6 +27,8 @@ function Metric({
 }
 
 export default async function DashboardPage() {
+  await requireSession();
+
   const [metrics, stalled] = await Promise.all([
     getDashboardMetrics(),
     getStalledLeads(),

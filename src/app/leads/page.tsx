@@ -7,6 +7,7 @@ import {
   formatLeadStatus,
   leadStatusTone,
 } from "@/lib/format";
+import { requireSession } from "@/server/auth/require-session";
 import { countLeadsByStatus, listLeads } from "@/server/leads/lead-queries";
 
 export const dynamic = "force-dynamic";
@@ -26,6 +27,8 @@ export default async function LeadsPage({
 }: {
   searchParams: Promise<{ status?: string; page?: string }>;
 }) {
+  await requireSession("/leads");
+
   const params = await searchParams;
 
   // An unrecognised status in the URL shows everything rather than erroring:

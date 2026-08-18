@@ -34,6 +34,13 @@ export default function RootLayout({
             <Link href="/">Dashboard</Link>
             <Link href="/leads">Leads</Link>
           </nav>
+
+          {/* POST, not a link: a GET logout would fire on prefetch. */}
+          <form action="/logout" method="post" style={{ marginLeft: "auto" }}>
+            <button type="submit" className="link-button">
+              Sign out
+            </button>
+          </form>
         </header>
         <main>{children}</main>
       </body>
