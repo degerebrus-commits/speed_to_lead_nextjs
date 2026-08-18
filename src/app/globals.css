@@ -1,0 +1,402 @@
+/*
+ * One stylesheet, no framework. This is a single-screen internal dashboard for
+ * one business; a utility framework would add a build step and a dependency to
+ * style roughly a dozen elements (STANDARDS.md 50).
+ */
+
+:root {
+  --bg: #f6f7f9;
+  --surface: #ffffff;
+  --border: #dfe3e8;
+  --text: #1a1d21;
+  --text-muted: #5c6670;
+
+  --accent: #1b64c4;
+  --accent-soft: #e8f0fb;
+
+  --good: #17694a;
+  --good-soft: #e3f3ec;
+  --warn: #8a5300;
+  --warn-soft: #fbf0dd;
+  --bad: #a32020;
+  --bad-soft: #fbe9e9;
+
+  --radius: 8px;
+  --gap: 16px;
+}
+
+@media (prefers-color-scheme: dark) {
+  :root {
+    --bg: #14171a;
+    --surface: #1c2024;
+    --border: #2e343a;
+    --text: #eef1f4;
+    --text-muted: #a2acb6;
+
+    --accent: #6ea8f0;
+    --accent-soft: #1d2a3b;
+
+    --good: #6dd3a8;
+    --good-soft: #163025;
+    --warn: #e0b060;
+    --warn-soft: #33280f;
+    --bad: #f08d8d;
+    --bad-soft: #351919;
+  }
+}
+
+* {
+  box-sizing: border-box;
+}
+
+body {
+  margin: 0;
+  background: var(--bg);
+  color: var(--text);
+  font: 15px/1.5 system-ui, -apple-system, "Segoe UI", sans-serif;
+}
+
+a {
+  color: var(--accent);
+}
+
+.site-header {
+  background: var(--surface);
+  border-bottom: 1px solid var(--border);
+  padding: 14px 24px;
+  display: flex;
+  align-items: baseline;
+  gap: 24px;
+  flex-wrap: wrap;
+}
+
+.site-header h1 {
+  font-size: 16px;
+  margin: 0;
+  font-weight: 600;
+}
+
+.site-header nav {
+  display: flex;
+  gap: 16px;
+}
+
+.site-header nav a {
+  text-decoration: none;
+  color: var(--text-muted);
+  font-weight: 500;
+}
+
+.site-header nav a:hover {
+  color: var(--accent);
+}
+
+main {
+  max-width: 1080px;
+  margin: 0 auto;
+  padding: 24px;
+}
+
+h2 {
+  font-size: 18px;
+  margin: 0 0 4px;
+}
+
+.subtitle {
+  color: var(--text-muted);
+  margin: 0 0 20px;
+  font-size: 14px;
+}
+
+.card {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  padding: 16px;
+}
+
+.metric-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+  gap: var(--gap);
+  margin-bottom: 28px;
+}
+
+.metric-label {
+  font-size: 13px;
+  color: var(--text-muted);
+  margin: 0 0 6px;
+}
+
+.metric-value {
+  font-size: 26px;
+  font-weight: 650;
+  margin: 0;
+  letter-spacing: -0.01em;
+}
+
+.metric-note {
+  font-size: 13px;
+  color: var(--text-muted);
+  margin: 6px 0 0;
+}
+
+table {
+  width: 100%;
+  border-collapse: collapse;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  overflow: hidden;
+}
+
+th,
+td {
+  text-align: left;
+  padding: 11px 14px;
+  border-bottom: 1px solid var(--border);
+  vertical-align: top;
+}
+
+th {
+  font-size: 13px;
+  color: var(--text-muted);
+  font-weight: 600;
+  background: var(--bg);
+}
+
+tbody tr:last-child td {
+  border-bottom: none;
+}
+
+.table-scroll {
+  overflow-x: auto;
+}
+
+/*
+ * Status carries a text label as well as its colour. Colour alone would fail
+ * anyone who cannot distinguish these hues (STANDARDS.md 35).
+ */
+.badge {
+  display: inline-block;
+  font-size: 12px;
+  font-weight: 600;
+  padding: 2px 8px;
+  border-radius: 999px;
+  white-space: nowrap;
+}
+
+.badge-neutral {
+  background: var(--accent-soft);
+  color: var(--accent);
+}
+.badge-good {
+  background: var(--good-soft);
+  color: var(--good);
+}
+.badge-warn {
+  background: var(--warn-soft);
+  color: var(--warn);
+}
+.badge-bad {
+  background: var(--bad-soft);
+  color: var(--bad);
+}
+
+.filters {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+  margin-bottom: 16px;
+}
+
+.filters a {
+  font-size: 13px;
+  text-decoration: none;
+  padding: 5px 11px;
+  border: 1px solid var(--border);
+  border-radius: 999px;
+  color: var(--text-muted);
+  background: var(--surface);
+}
+
+.filters a[aria-current="true"] {
+  border-color: var(--accent);
+  background: var(--accent-soft);
+  color: var(--accent);
+  font-weight: 600;
+}
+
+.empty-state {
+  background: var(--surface);
+  border: 1px dashed var(--border);
+  border-radius: var(--radius);
+  padding: 40px 24px;
+  text-align: center;
+  color: var(--text-muted);
+}
+
+.empty-state strong {
+  display: block;
+  color: var(--text);
+  margin-bottom: 6px;
+  font-size: 15px;
+}
+
+.thread {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.bubble {
+  max-width: 78%;
+  padding: 10px 13px;
+  border-radius: 12px;
+  border: 1px solid var(--border);
+}
+
+.bubble-inbound {
+  align-self: flex-start;
+  background: var(--surface);
+  border-bottom-left-radius: 3px;
+}
+
+.bubble-outbound {
+  align-self: flex-end;
+  background: var(--accent-soft);
+  border-color: transparent;
+  border-bottom-right-radius: 3px;
+}
+
+.bubble-meta {
+  display: block;
+  font-size: 12px;
+  color: var(--text-muted);
+  margin-top: 5px;
+}
+
+.bubble p {
+  margin: 0;
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+}
+
+.detail-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+  gap: var(--gap);
+  margin-bottom: 24px;
+}
+
+.detail-grid dt {
+  font-size: 13px;
+  color: var(--text-muted);
+}
+
+.detail-grid dd {
+  margin: 3px 0 0;
+  overflow-wrap: anywhere;
+}
+
+.pager {
+  display: flex;
+  gap: 12px;
+  align-items: center;
+  margin-top: 16px;
+  font-size: 14px;
+  color: var(--text-muted);
+}
+
+.notice {
+  border-radius: var(--radius);
+  padding: 14px 16px;
+  margin-bottom: 20px;
+  border: 1px solid;
+}
+
+.notice-warn {
+  background: var(--warn-soft);
+  border-color: var(--warn);
+  color: var(--warn);
+}
+
+.notice-bad {
+  background: var(--bad-soft);
+  border-color: var(--bad);
+  color: var(--bad);
+}
+
+.notice h3 {
+  margin: 0 0 4px;
+  font-size: 15px;
+}
+
+.notice p {
+  margin: 0;
+  font-size: 14px;
+}
+
+.button {
+  font: inherit;
+  font-weight: 600;
+  font-size: 14px;
+  padding: 8px 16px;
+  border-radius: var(--radius);
+  border: 1px solid var(--border);
+  background: var(--surface);
+  color: var(--text);
+  cursor: pointer;
+}
+
+.button:hover {
+  border-color: var(--accent);
+  color: var(--accent);
+}
+
+/* Visible to screen readers only - table captions that would duplicate a
+   heading already on the page. */
+.sr-only {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  margin: -1px;
+  overflow: hidden;
+  clip: rect(0, 0, 0, 0);
+  white-space: nowrap;
+  border: 0;
+}
+
+/* Loading placeholders (STANDARDS.md 36). */
+.skeleton {
+  background: linear-gradient(90deg, var(--border) 25%, var(--bg) 50%, var(--border) 75%);
+  background-size: 200% 100%;
+  animation: shimmer 1.3s infinite linear;
+  border-radius: 4px;
+  height: 14px;
+}
+
+.skeleton-value {
+  height: 26px;
+  width: 60%;
+  margin-top: 6px;
+}
+
+@keyframes shimmer {
+  from {
+    background-position: 200% 0;
+  }
+  to {
+    background-position: -200% 0;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .skeleton {
+    animation: none;
+  }
+}
