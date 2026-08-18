@@ -6,7 +6,7 @@ not), `SPEC-COMPARISON.md` (how this differs from the Express build),
 `MISTAKES.md` (what went wrong and the rules that prevent it), and
 `STANDARDS.md`.
 
-**180 tests passing**, typecheck clean, production build succeeds, CI runs on
+**218 tests passing**, typecheck clean, production build succeeds, CI runs on
 every push.
 
 ---
@@ -35,7 +35,7 @@ instead, so the link between the projects is a specification rather than a copy.
 | 4 — AI qualification | **Done**, verified live on `claude-haiku-4-5` |
 | 5 — Booking | **Done** — fixed slots, no calendar needed for MVP |
 | 6 — Analytics | **Done** — speed to lead, booking rate, after-hours split |
-| 7 — Hardening | **Started** — dashboard auth done; see Outstanding |
+| 7 — Hardening | **Mostly done** — auth, consent, HELP, owner alerts, and every finding from the security review |
 
 ---
 
@@ -71,27 +71,30 @@ every line past the signature check. Likely moot if the client provides Twilio.
 
 ## Outstanding, in priority order
 
-1. **`scheduledAt` on `Appointment`.** Today an appointment stores a slot *label*
-   ("Thu 2pm-4pm"), so nobody can answer "what is on tomorrow?". Roughly an hour,
-   and Google Calendar needs real timestamps regardless.
-2. **Cancel and reschedule.** Both are PRD requirements and neither exists. No
-   code path anywhere sets `AppointmentStatus.CANCELLED`, so a slot booked by
-   mistake cannot be released without hand-editing SQL.
-3. **Remaining security findings.** The rate-limiter key is taken from an
-   unvalidated `X-Forwarded-For` and is unbounded, so it can be both bypassed
-   and used to grow memory pre-auth. `POST /api/leads/retry-intro-sms` has no
-   rate limit at all. The logger redacts key *names* at depth 1 only, while every
-   route logs `error.message` unscrubbed.
-4. **A Dockerfile and deployment config.** None exists, and Railway is the
+1. **A Dockerfile and deployment config.** None exists, and Railway is the
    documented target. `SPEC-COMPARISON.md` notes the Express build has this
-   already and it is worth following.
-5. **Structured qualification.** Urgency, property type and preferred time are
+   already and it is worth following. This is the only thing between a working
+   application and a deployed one.
+2. **Structured qualification.** Urgency, property type and preferred time are
    discussed with the customer and then left in message text, unqueryable. The
-   other build's `record_qualification` tool idea closes this — the model
-   extracts, the code still executes.
-6. **`STANDARDS.md` §13/§14/§15/§57.3.** They mandate multi-tenancy and
+   other build's `record_qualification` tool idea closes this - the model
+   extracts, the code still executes. Do not give it `book_appointment`.
+3. **An upcoming-appointments view.** Appointments now carry `scheduledAt`, so
+   "what is on tomorrow" is finally answerable and nothing displays it.
+4. **Google Calendar.** The largest PRD divergence, and genuinely optional
+   while fixed slots serve the MVP. Needs the timestamps that now exist.
+5. **`STANDARDS.md` §13/§14/§15/§57.3.** They mandate multi-tenancy and
    OWNER/ADMIN/STAFF roles, which this build deliberately does not have. Still
    untouched pending permission; the contradiction resurfaces every session.
+
+### Done since this file was last written
+
+`scheduledAt` on appointments - which uncovered that the schedule exhausted
+permanently after six bookings, because the slot key ignored dates. Cancel and
+reschedule, so a mis-booked slot can be released. And all three remaining
+security findings: the rate-limit key is bounded and no longer trusts a
+caller-supplied header, the retry endpoint is limited, and the logger recurses
+and scrubs secret *values* rather than only key names.
 
 ---
 
