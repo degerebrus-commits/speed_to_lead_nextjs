@@ -9,7 +9,15 @@ import type { SmsMessage, SmsProvider } from "@/server/sms/sms-provider";
 import { setSmsProviderForTesting } from "@/server/sms/sms-service";
 
 const ORIGINAL = { ...process.env };
-const AT = new Date("2026-08-18T12:00:00Z"); // Tuesday, 07:00 Chicago
+/**
+ * Booked relative to the real clock, not a fixed instant.
+ *
+ * A hard-coded date made these specs time-dependent: bookSlot resolved the slot
+ * against that date, while findActiveAppointment filters on the real now, so an
+ * appointment booked for 14:00Z stopped being cancellable once the wall clock
+ * passed 14:00Z. They passed all morning and failed after lunch.
+ */
+const AT = new Date();
 
 let seq = 0;
 async function seedLead() {

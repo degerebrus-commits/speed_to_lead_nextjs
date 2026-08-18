@@ -83,7 +83,7 @@ const baseSchema = z.object({
 
   SMS_INTRO_TEMPLATE: z.string().min(1).default(DEFAULT_SMS_INTRO_TEMPLATE),
 
-  SMS_PROVIDER: z.enum(["console", "textbee", "twilio"]).default("console"),
+  SMS_PROVIDER: z.enum(["console", "textbee", "sms-gate", "twilio"]).default("console"),
 
   /**
    * Hard ceiling on real texts sent per calendar month. Exists because the
@@ -91,6 +91,33 @@ const baseSchema = z.object({
    * seconds. Not billing-accurate - a safety valve, not an invariant.
    */
   SMS_MONTHLY_LIMIT: z.coerce.number().int().positive().default(50),
+
+  /**
+   * SMS Gate (capcom6/android-sms-gateway). Required only when
+   * SMS_PROVIDER=sms-gate.
+   *
+   * The base URL differs by mode: http://<device-ip>:8080 for the local
+   * server, https://api.sms-gate.app/3rdparty/v1 for the cloud one, or your
+   * own host for a private server.
+   */
+  SMS_GATE_URL: z.string().url().optional(),
+  SMS_GATE_USERNAME: z.string().min(1).optional(),
+  SMS_GATE_PASSWORD: z.string().min(1).optional(),
+
+  /**
+   * Guards the SMS Gate inbound webhook, which is NOT signed.
+   *
+   * TextBee sends an HMAC over the raw body; SMS Gate's documentation says
+   * security rests on the receiving endpoint having a valid certificate, which
+   * is transport security rather than authentication - it proves nobody read
+   * the message, not who sent it. Without a guard, anyone who learns the URL
+   * could forge a customer reply and drive a booking.
+   *
+   * So the secret lives in the path and is compared in constant time. Crude,
+   * but the URL is only ever configured into the gateway and never appears in
+   * a browser.
+   */
+  SMS_GATE_WEBHOOK_SECRET: z.string().min(24).optional(),
 
   // Required only when SMS_PROVIDER=textbee - see the refinement below.
   TEXTBEE_API_KEY: z.string().min(1).optional(),
@@ -241,6 +268,23 @@ const envSchema = baseSchema.superRefine((env, ctx) => {
           code: z.ZodIssueCode.custom,
           path: [key],
           message: "is required when SMS_PROVIDER=textbee",
+        });
+      }
+    }
+  }
+
+  if (env.SMS_PROVIDER === "sms-gate") {
+    for (const key of [
+      "SMS_GATE_URL",
+      "SMS_GATE_USERNAME",
+      "SMS_GATE_PASSWORD",
+      "SMS_GATE_WEBHOOK_SECRET",
+    ] as const) {
+      if (!env[key]) {
+        ctx.addIssue({
+          code: z.ZodIssueCode.custom,
+          path: [key],
+          message: "is required when SMS_PROVIDER=sms-gate",
         });
       }
     }

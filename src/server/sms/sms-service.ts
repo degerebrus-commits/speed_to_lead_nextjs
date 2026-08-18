@@ -4,6 +4,7 @@ import { getEnv } from "@/config/env";
 import { prisma } from "@/lib/db";
 import { logger } from "@/lib/logger";
 import { consoleSmsProvider } from "./console-sms-provider";
+import { smsGateProvider } from "./sms-gate-provider";
 import { textBeeSmsProvider } from "./textbee-sms-provider";
 import type { SmsProvider } from "./sms-provider";
 import { buildIntroMessage, renderTemplate } from "./sms-templates";
@@ -26,13 +27,13 @@ export function getSmsProvider(): SmsProvider {
     throw new Error("SMS_PROVIDER=twilio is not implemented yet - it needs the client's account");
   }
 
-  if (SMS_PROVIDER === "textbee") {
+  if (SMS_PROVIDER === "textbee" || SMS_PROVIDER === "sms-gate") {
     // Belt and braces against a misconfigured test run spending real quota.
     // tests/setup.ts pins SMS_PROVIDER=console, but a stray .env would not.
     if (process.env.NODE_ENV === "test") {
       throw new Error("Refusing to use the real SMS gateway during tests");
     }
-    return textBeeSmsProvider;
+    return SMS_PROVIDER === "sms-gate" ? smsGateProvider : textBeeSmsProvider;
   }
 
   return consoleSmsProvider;
