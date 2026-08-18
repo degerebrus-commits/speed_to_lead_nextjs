@@ -118,10 +118,13 @@ disconnects Prisma after every file (setup files run per file, and the suite
 shares one fork, so it was tearing down the pool two dozen times a run).
 Neither cured it, because neither was the cause.
 
-**Expect CI to be green** - dedicated runner, its own Postgres, no antivirus.
-If CI ever goes red intermittently, that is new information and worth
-chasing. Locally, closing Chrome or excluding this folder from Defender is
-the fix.
+**Confirmed by CI: eight runs, eight green**, including the three pushed while
+local runs were still flaking. The same suite that fails one run in three here
+passes every time on a clean runner in about 75 seconds.
+
+**So CI is the honest signal, not the local run.** A red local run against a
+green CI means the machine did it - close Chrome, or exclude this folder from
+Windows Defender. Chase the code only when CI itself goes red.
 
 **`Firstline-Landing-Package.html` is untracked at the repo root**, newer than
 the copy in the landing repo. It belongs there, not here.
