@@ -106,21 +106,24 @@ Send that same string as `smsConsentText`.
   at least 7 digits) and let the server do the real check. Do not attempt
   strict E.164 parsing in the browser.
 
-**A reset control, because this form is used by more than one person.** It sits
-on a public landing page — at a trade stand, or passed around a laptop — so the
-next visitor must not inherit the last one's name and phone number, or worse,
-be able to submit them again.
+**One reset control, because this form is used by more than one person.** It
+sits on a public landing page — at a trade stand, or passed around a laptop — so
+the next visitor must not inherit the last one's name and phone number, or
+worse, be able to submit them again.
 
-- A small **"Start over"** control in the **upper right of the form card**,
+- A single **"Start over"** control in the **upper right of the form card**,
   quiet rather than prominent: it must not compete with the submit button.
 - It clears every field, resets the consent control to un-agreed, clears any
-  error, and returns the message field to its pre-filled default.
-- It is **always visible**, not only after a submission — someone who has
-  half-filled the form and changed their mind needs it too.
-- The success state gets its own, larger **"Send another demo"** button, since
-  that is the moment the next person steps up.
-- Resetting must never re-submit or clear the success state without the visitor
-  choosing to.
+  error and status message, and returns the message field to its pre-filled
+  default.
+- **Always visible — including in the success state**, where it is what the
+  next person presses. One control that handles every case; do not add a
+  separate "send another" button.
+- It must never submit anything. Its only job is to empty the form.
+
+Note the deliberate asymmetry: the form clears itself on **success**, but never
+on **failure**. Someone who mistyped their number must get it back to correct,
+not have to retype everything.
 
 ## Tone and content
 
