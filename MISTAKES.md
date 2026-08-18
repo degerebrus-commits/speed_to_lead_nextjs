@@ -13,6 +13,99 @@ recurring symptom as flakiness instead of finding its cause**.
 
 ---
 
+## Three wrong diagnoses before finding the real one
+
+**What happened.** The suite failed about one run in three. I blamed, in order:
+a loaded machine (retracted when containers showed 0% CPU), a per-file
+`prisma.$disconnect()`, and vitest's timeout. I changed code for the last two.
+None was the cause. The failures landed consistently at **5.1-5.3 seconds** -
+which is Prisma's *connection-pool* timeout, not vitest's - and
+`getDashboardMetrics` issues five concurrent queries while the whole suite runs
+in one fork.
+
+**Root cause of the mistake.** The timing was in every failure line from the
+start and I read it as "about five seconds, so probably the timeout" instead of
+"exactly the pool timeout, every time". A number that repeats to three
+significant figures is a fingerprint, not an approximation.
+
+**The correct fix.** `connection_limit=25` on the test database URL. Two runs in
+three failing became one in five.
+
+**Prevention rule.** When a failure recurs at a suspiciously consistent
+duration, find out what has a timeout of exactly that length before changing
+anything.
+
+---
+
+## Backgrounded a command that backgrounded itself
+
+**What happened.** I ran a Docker build with `nohup ... &` inside a call that
+was already backgrounded. The outer command returned instantly with exit 0, the
+harness reported success, and the build died with the shell. I only noticed
+because the image did not exist twenty minutes later.
+
+**Prevention rule.** Let one layer own the backgrounding. `&` inside a
+backgrounded call reports on the wrong process.
+
+---
+
+## A shell loop split filenames on spaces and reported files as missing
+
+**What happened.** Before deleting the duplicated `landing/` folder I checked
+every file existed in the other repository. `for f in $(git ls-files)` split
+"Firstline Demo v2.dc.html" into three words, so the check reported thirteen
+missing files that were all present. Acting on it would have kept the
+duplicate.
+
+**Prevention rule.** `while IFS= read -r` over a pipe, never `for` over
+`$(...)`, when anything might contain a space. And when a check reports
+something surprising, suspect the check first.
+
+---
+
+## Copied a CLI without its dependencies
+
+**What happened.** The Dockerfile copied `node_modules/prisma` so migrations
+could run at startup. Its own dependency tree was left behind and the container
+died on `MODULE_NOT_FOUND` for `@prisma/config`.
+
+**The correct fix.** Install it in the runner stage, pinned to the *lockfile*
+version rather than the `package.json` range - the CLI applying a migration
+should be the one that generated the client.
+
+**Prevention rule.** Copying a package out of `node_modules` copies a leaf, not
+a tree.
+
+---
+
+## Ignored a warning from my own tooling, and shipped a broken command
+
+**What happened.** I wrote a PowerShell path into `STATUS.md` through a Python
+heredoc. Python printed `SyntaxWarning: invalid escape sequence` and I read past
+it. `` became a vertical tab and `` a carriage return, so the documented
+command was `\Claudem_bundles\claudevm.bundleootfs.vhdx` - unrunnable, in the
+file a new session reads first.
+
+**Prevention rule.** A warning from the tool doing the work is evidence, not
+noise. And never build Windows paths in a language that interprets
+backslashes - use a literal-text editor.
+
+---
+
+## `git add -A` swept unverified work into a documentation commit
+
+**What happened.** I staged everything to commit a `STATUS.md` edit. It also
+committed the entire unverified Phase 5 booking implementation under a message
+saying "docs:".
+
+**The correct fix.** Amended the message to describe what was actually in it,
+including that the tests had never run.
+
+**Prevention rule.** Stage deliberately. `-A` in a focused commit takes whatever
+else happens to be in the tree.
+
+---
+
 ## Called Docker "unstable" for hours instead of checking the disk
 
 **What happened.** Docker's engine returned 500 errors, the Postgres container
