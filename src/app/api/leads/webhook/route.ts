@@ -3,7 +3,7 @@ import { getEnv } from "@/config/env";
 import { errorResponse, type FieldIssue } from "@/lib/api-error";
 import { logger } from "@/lib/logger";
 import { PhoneNormalizationError } from "@/lib/phone";
-import { checkRateLimit, pruneRateLimitWindows } from "@/lib/rate-limit";
+import { checkRateLimit, pruneRateLimitWindows, rateLimitKey } from "@/lib/rate-limit";
 import { leadWebhookSchema } from "@/lib/validation/lead-schema";
 import { createLead } from "@/server/leads/lead-service";
 import { sendIntroSms } from "@/server/sms/sms-service";
@@ -15,10 +15,23 @@ export const dynamic = "force-dynamic";
 
 function getClientIp(request: Request): string {
   const forwarded = request.headers.get("x-forwarded-for");
+
   if (forwarded) {
-    const [first] = forwarded.split(",");
-    if (first?.trim()) return first.trim();
+    const hops = forwarded.split(",").map((hop) => hop.trim()).filter(Boolean);
+
+    if (hops.length > 0) {
+      // The LAST hop, not the first. A proxy appends the address it saw, so the
+      // last entry is the one our own infrastructure wrote; everything before it
+      // was supplied by the caller and can say anything. Taking the first entry
+      // let anyone rotate the value per request and slip the limit entirely.
+      //
+      // With no proxy in front, TRUSTED_PROXY stays false and every request
+      // shares one bucket: a blunt limit is better than one that can be
+      // sidestepped by setting a header.
+      return getEnv().TRUSTED_PROXY === "true" ? hops[hops.length - 1] : "untrusted-proxy";
+    }
   }
+
   return request.headers.get("x-real-ip")?.trim() || "unknown";
 }
 
@@ -64,7 +77,11 @@ export async function POST(request: Request): Promise<Response> {
 
   pruneRateLimitWindows();
 
-  const rateLimit = checkRateLimit(ip, env.RATE_LIMIT_MAX_REQUESTS, env.RATE_LIMIT_WINDOW_MS);
+  const rateLimit = checkRateLimit(
+    rateLimitKey(`leads-webhook:${ip}`),
+    env.RATE_LIMIT_MAX_REQUESTS,
+    env.RATE_LIMIT_WINDOW_MS,
+  );
   if (!rateLimit.allowed) {
     logger.warn("Lead webhook rate limited", { ip });
     const response = errorResponse(429, "RATE_LIMITED", "Too many requests. Please retry shortly.");

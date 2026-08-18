@@ -5,6 +5,36 @@ import { getEnv, resetEnvCache } from "@/config/env";
 const ORIGINAL = { ...process.env };
 
 /**
+ * Everything that must have a working default. Deleted before each case so the
+ * schema is exercised on its defaults rather than on whatever .env supplies.
+ */
+const OPTIONAL_KEYS = [
+  "SERVICE_AREA",
+  "REP_NAME",
+  "BUSINESS_TIMEZONE",
+  "BUSINESS_HOURS",
+  "BUSINESS_OPEN_HOUR",
+  "BUSINESS_CLOSE_HOUR",
+  "BUSINESS_OPEN_DAYS",
+  "OWNER_PHONE",
+  "SMS_PROVIDER",
+  "SMS_INTRO_TEMPLATE",
+  "SMS_MONTHLY_LIMIT",
+  "BOOKING_MODE",
+  "AVAILABLE_TIME_SLOTS",
+  "APPOINTMENT_DURATION_MINUTES",
+  "DASHBOARD_PASSWORD",
+  "DASHBOARD_SESSION_SECRET",
+  "DASHBOARD_SESSION_HOURS",
+  "DEMO_FORM_ENABLED",
+  "TRUSTED_PROXY",
+  "TEXTBEE_API_KEY",
+  "TEXTBEE_DEVICE_ID",
+  "TEXTBEE_WEBHOOK_SECRET",
+  "ANTHROPIC_API_KEY",
+];
+
+/**
  * Every default must satisfy its own schema.
  *
  * SERVICE_AREA carried `.min(1).default("")` - the default failed the rule,
@@ -14,21 +44,26 @@ const ORIGINAL = { ...process.env };
  */
 describe("configuration defaults", () => {
   beforeEach(() => {
-    // The true minimum a deployment must supply. Everything else has to
-    // default to something the schema itself accepts.
+    // Deletes the optional keys rather than replacing process.env wholesale.
     //
-    // The AI key belongs here rather than being a defaulting failure: an
-    // assistant cannot converse without one, so requiring it is a real
-    // dependency. SERVICE_AREA was different - it carried a rule its own
-    // default broke, which is a bug rather than a requirement.
-    process.env = {
-      NODE_ENV: "test",
-      DATABASE_URL: ORIGINAL.DATABASE_URL,
-      LEAD_WEBHOOK_SECRET: "0123456789abcdef0123",
-      BUSINESS_NAME: "Defaults Test Co",
-      BUSINESS_COUNTRY_CODE: "+1",
-      OPENAI_API_KEY: "sk-not-a-real-key-tests-never-call-out",
-    } as NodeJS.ProcessEnv;
+    // vitest runs every file in one fork here (the suite shares a Postgres and
+    // truncates between cases), so process.env is global to the whole run.
+    // Swapping the object out left other files' module-level snapshots holding
+    // a stripped copy, depending on import order - which showed up as one
+    // failure in roughly every three runs, in a different file each time.
+    for (const key of OPTIONAL_KEYS) delete process.env[key];
+
+    // NODE_ENV is readonly in the type but already "test" under vitest.
+    process.env.DATABASE_URL = ORIGINAL.DATABASE_URL;
+    process.env.LEAD_WEBHOOK_SECRET = "0123456789abcdef0123";
+    process.env.BUSINESS_NAME = "Defaults Test Co";
+    process.env.BUSINESS_COUNTRY_CODE = "+1";
+    // A real dependency, not a defaulting failure: an assistant cannot converse
+    // without an AI key. SERVICE_AREA was different - it carried a rule its own
+    // default broke, which is a bug.
+    process.env.AI_PROVIDER = "openai";
+    process.env.OPENAI_API_KEY = "sk-not-a-real-key-tests-never-call-out";
+
     resetEnvCache();
   });
 

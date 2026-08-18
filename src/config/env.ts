@@ -22,6 +22,17 @@ const baseSchema = z.object({
     .string()
     .min(16, "must be at least 16 characters - generate with: openssl rand -hex 24"),
 
+  /**
+   * Whether a reverse proxy in front of this app writes X-Forwarded-For.
+   *
+   * Off by default. When off, the header is ignored entirely for rate-limit
+   * bucketing and every caller shares one bucket - a blunt limit that cannot be
+   * sidestepped beats a per-IP limit anyone can evade by setting a header.
+   * Turn it on only when something you control appends the real client address
+   * (Railway, Vercel, nginx).
+   */
+  TRUSTED_PROXY: z.enum(["true", "false"]).default("false"),
+
   RATE_LIMIT_MAX_REQUESTS: z.coerce.number().int().positive().default(10),
   RATE_LIMIT_WINDOW_MS: z.coerce.number().int().positive().default(60_000),
 

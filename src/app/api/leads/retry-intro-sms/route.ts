@@ -1,6 +1,7 @@
 import { timingSafeEqual } from "node:crypto";
 import { getEnv } from "@/config/env";
 import { errorResponse } from "@/lib/api-error";
+import { checkRateLimit, pruneRateLimitWindows, rateLimitKey } from "@/lib/rate-limit";
 import { logger } from "@/lib/logger";
 import { countPendingIntroSms, retryPendingIntroSms } from "@/server/leads/intro-sms-retry";
 
@@ -39,6 +40,24 @@ export async function POST(request: Request): Promise<Response> {
     return errorResponse(503, "INTERNAL_ERROR", "Service is not correctly configured.");
   }
 
+  // Limited before the secret is checked, not after: this was the only
+  // publicly reachable endpoint with no limit at all, so an attacker could
+  // drive unlimited constant-time comparisons and unlimited requests at the
+  // process without ever holding a valid secret.
+  pruneRateLimitWindows();
+  const rateLimit = checkRateLimit(
+    rateLimitKey("retry-intro-sms"),
+    env.RATE_LIMIT_MAX_REQUESTS,
+    env.RATE_LIMIT_WINDOW_MS,
+  );
+
+  if (!rateLimit.allowed) {
+    logger.warn("Retry endpoint rate limited");
+    const response = errorResponse(429, "RATE_LIMITED", "Too many requests.");
+    response.headers.set("Retry-After", String(rateLimit.retryAfterSeconds));
+    return response;
+  }
+
   if (!isValidSecret(request.headers.get("x-webhook-secret"), env.LEAD_WEBHOOK_SECRET)) {
     logger.warn("Retry endpoint rejected: invalid secret");
     return errorResponse(401, "UNAUTHORIZED", "Invalid or missing webhook secret.");
@@ -65,7 +84,17 @@ export async function POST(request: Request): Promise<Response> {
 
 /** Read-only queue depth, so the backlog can be checked without sending. */
 export async function GET(request: Request): Promise<Response> {
-  const env = getEnv();
+  // Wrapped like POST's. Unwrapped, a configuration error here surfaced as an
+  // unhandled 500 with a stack, rather than the 503 that says what is wrong.
+  let env: ReturnType<typeof getEnv>;
+  try {
+    env = getEnv();
+  } catch (error) {
+    logger.error("Refusing request: environment is not valid", {
+      reason: error instanceof Error ? error.message : String(error),
+    });
+    return errorResponse(503, "INTERNAL_ERROR", "Service is not correctly configured.");
+  }
 
   if (!isValidSecret(request.headers.get("x-webhook-secret"), env.LEAD_WEBHOOK_SECRET)) {
     return errorResponse(401, "UNAUTHORIZED", "Invalid or missing webhook secret.");

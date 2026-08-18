@@ -1,3 +1,5 @@
+import { createHash } from "node:crypto";
+
 interface Window {
   count: number;
   resetAt: number;
@@ -20,11 +22,45 @@ export interface RateLimitResult {
  */
 const windows = new Map<string, Window>();
 
+/**
+ * Ceiling on distinct keys held at once.
+ *
+ * The key derives from a request header, so its cardinality is chosen by the
+ * caller, not by us. Without a cap an unauthenticated attacker sending a fresh
+ * X-Forwarded-For per request grows this map for a whole window - hundreds of
+ * megabytes a minute, before any authentication has run.
+ */
+const MAX_TRACKED_KEYS = 10_000;
+
+/**
+ * Bounds a caller-supplied key.
+ *
+ * Hashing does two things: it fixes the length regardless of what arrived in
+ * the header (Node accepts headers up to 16KB), and it keeps raw addresses out
+ * of memory. Truncation is fine here - this is a bucket label, not a
+ * credential, and a collision costs a shared rate limit.
+ */
+export function rateLimitKey(raw: string): string {
+  return createHash("sha256").update(raw).digest("hex").slice(0, 32);
+}
+
 export function checkRateLimit(key: string, maxRequests: number, windowMs: number): RateLimitResult {
   const now = Date.now();
   const existing = windows.get(key);
 
   if (!existing || now >= existing.resetAt) {
+    // At the ceiling, drop what has expired before admitting anything new.
+    if (!existing && windows.size >= MAX_TRACKED_KEYS) {
+      pruneRateLimitWindows(now);
+
+      // Still full means the map is saturated with live windows, which is an
+      // attack rather than traffic. Refuse rather than grow: a shared limit
+      // degrades service, an unbounded map ends it.
+      if (windows.size >= MAX_TRACKED_KEYS) {
+        return { allowed: false, retryAfterSeconds: Math.ceil(windowMs / 1000) };
+      }
+    }
+
     windows.set(key, { count: 1, resetAt: now + windowMs });
     return { allowed: true, retryAfterSeconds: 0 };
   }

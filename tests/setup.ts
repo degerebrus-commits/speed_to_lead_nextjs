@@ -90,5 +90,14 @@ beforeEach(async () => {
 });
 
 afterAll(async () => {
-  await prisma.$disconnect();
+  // Deliberately does NOT disconnect.
+  //
+  // setupFiles run once per test file, and vitest.config.ts pins the whole
+  // suite to a single fork, so this hook fires after every file against the
+  // same client - tearing down the connection pool two dozen times mid-run.
+  // The next file's first queries then raced the reconnect and timed out,
+  // which presented as a different test failing in roughly one run in three.
+  //
+  // The pool is released when the process exits, which is the moment the suite
+  // is over anyway.
 });

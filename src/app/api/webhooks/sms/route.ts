@@ -1,7 +1,7 @@
 import { getEnv } from "@/config/env";
 import { errorResponse } from "@/lib/api-error";
 import { logger } from "@/lib/logger";
-import { checkRateLimit, pruneRateLimitWindows } from "@/lib/rate-limit";
+import { checkRateLimit, pruneRateLimitWindows, rateLimitKey } from "@/lib/rate-limit";
 import { isValidWebhookSignature, isWithinFreshnessWindow } from "@/lib/webhook-signature";
 import { handleCustomerReply } from "@/server/ai/conversation-service";
 import { prisma } from "@/lib/db";
@@ -19,10 +19,23 @@ const ACKNOWLEDGED_EVENTS = new Set(["MESSAGE_SENT", "MESSAGE_DELIVERED", "MESSA
 
 function getClientIp(request: Request): string {
   const forwarded = request.headers.get("x-forwarded-for");
+
   if (forwarded) {
-    const [first] = forwarded.split(",");
-    if (first?.trim()) return first.trim();
+    const hops = forwarded.split(",").map((hop) => hop.trim()).filter(Boolean);
+
+    if (hops.length > 0) {
+      // The LAST hop, not the first. A proxy appends the address it saw, so the
+      // last entry is the one our own infrastructure wrote; everything before it
+      // was supplied by the caller and can say anything. Taking the first entry
+      // let anyone rotate the value per request and slip the limit entirely.
+      //
+      // With no proxy in front, TRUSTED_PROXY stays false and every request
+      // shares one bucket: a blunt limit is better than one that can be
+      // sidestepped by setting a header.
+      return getEnv().TRUSTED_PROXY === "true" ? hops[hops.length - 1] : "untrusted-proxy";
+    }
   }
+
   return request.headers.get("x-real-ip")?.trim() || "unknown";
 }
 
@@ -60,7 +73,7 @@ export async function POST(request: Request): Promise<Response> {
 
   pruneRateLimitWindows();
   const rateLimit = checkRateLimit(
-    `sms-webhook:${ip}`,
+    rateLimitKey(`sms-webhook:${ip}`),
     env.SMS_WEBHOOK_RATE_LIMIT,
     env.RATE_LIMIT_WINDOW_MS,
   );
