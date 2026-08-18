@@ -48,6 +48,7 @@ export interface MessageTemplates {
   emergency: string;
   bookingConfirmation: string;
   help: string;
+  ownerAlert: string;
 }
 
 export interface BookingSettings {
@@ -84,6 +85,7 @@ export function getMessageTemplates(): MessageTemplates {
     emergency: env.SMS_EMERGENCY_TEMPLATE,
     bookingConfirmation: env.SMS_BOOKING_CONFIRMATION_TEMPLATE,
     help: env.SMS_HELP_TEMPLATE,
+    ownerAlert: env.SMS_OWNER_ALERT_TEMPLATE,
   };
 }
 

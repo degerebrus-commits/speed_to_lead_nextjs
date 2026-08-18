@@ -15,7 +15,7 @@ import {
 } from "@/server/booking/booking-service";
 import { detectEmergency } from "@/server/sms/emergency-detection";
 import { renderTemplate } from "@/server/sms/sms-templates";
-import { sendConversationSms } from "@/server/sms/sms-service";
+import { sendConversationSms, sendOwnerEmergencyAlert } from "@/server/sms/sms-service";
 import { generateQualificationReply } from "./ai-service";
 import { isWithinBusinessHours } from "./business-hours";
 
@@ -80,6 +80,26 @@ export async function handleCustomerReply(
       matchedKeyword: emergency.matchedKeyword,
       ownerPhoneConfigured: getBusinessProfile().ownerPhone !== null,
     });
+
+    // Alert the owner before answering the customer: if only one message gets
+    // out, it should be the one that brings a human. Wrapped because a failure
+    // here must not stop the customer's reply - and it is logged loudly,
+    // because an emergency nobody was told about is the worst outcome in this
+    // system.
+    try {
+      const alerted = await sendOwnerEmergencyAlert(lead, inboundBody);
+
+      if (!alerted) {
+        logger.error("Emergency NOT escalated to a human: OWNER_PHONE is not configured", {
+          leadId: lead.id,
+        });
+      }
+    } catch (error) {
+      logger.error("Emergency owner alert failed to send", {
+        leadId: lead.id,
+        reason: error instanceof Error ? error.message : String(error),
+      });
+    }
 
     await sendConversationSms(lead, reply);
 

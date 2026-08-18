@@ -234,3 +234,51 @@ export async function sendHelpReply(lead: Lead): Promise<void> {
 
   logger.info("HELP reply sent", { leadId: lead.id, provider: result.provider });
 }
+
+/**
+ * Texts the business owner that a customer has an emergency.
+ *
+ * Returns false when OWNER_PHONE is not configured, rather than throwing: an
+ * unalerted emergency is bad, but an exception here would abort the reply the
+ * customer is waiting on, which is worse. The caller logs the miss.
+ *
+ * The lead's own opt-out does not apply - the recipient is the business, not
+ * the customer, and someone who texted STOP can still have a gas leak. No
+ * OUTBOUND Message row is written either: that table is the customer's
+ * conversation, and an internal alert is not part of it.
+ */
+export async function sendOwnerEmergencyAlert(
+  lead: Lead,
+  customerMessage: string,
+): Promise<boolean> {
+  const business = getBusinessProfile();
+
+  if (!business.ownerPhone) return false;
+
+  const provider = getSmsProvider();
+
+  if (provider.name !== "console") {
+    await assertMonthlyQuotaRemaining(provider.name);
+  }
+
+  const body = renderTemplate(getMessageTemplates().ownerAlert, {
+    firstName: lead.name.split(/\s+/)[0] ?? lead.name,
+    businessName: business.name,
+    repName: business.repName,
+    phone: lead.phone,
+    // Truncated so one long text cannot push the alert over a segment
+    // boundary and cost the business several messages.
+    message: customerMessage.length > 140
+      ? `${customerMessage.slice(0, 137)}...`
+      : customerMessage,
+  });
+
+  const result = await provider.send({ to: business.ownerPhone, body });
+
+  logger.warn("Owner alerted to emergency", {
+    leadId: lead.id,
+    provider: result.provider,
+  });
+
+  return true;
+}

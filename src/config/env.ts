@@ -117,6 +117,15 @@ const baseSchema = z.object({
     "You're all set! Your appointment with {businessName} is confirmed for {time}. Reply STOP to opt out.",
   ),
   /**
+   * Sent to OWNER_PHONE when an emergency is detected. Goes to the business
+   * rather than a customer, so it carries what is needed to act - who, on what
+   * number, and what they said - and no opt-out line: the recipient operates
+   * the system, and this is not marketing.
+   */
+  SMS_OWNER_ALERT_TEMPLATE: z.string().min(1).default(
+    "EMERGENCY: {firstName} ({phone}) just texted {businessName} - \"{message}\" Call them now.",
+  ),
+  /**
    * Reply to HELP. Required by CTIA guidelines and by the consent disclosure
    * the customer agreed to on the form ("Reply HELP for help"), so it must
    * identify the business and repeat how to opt out. Answered from code, never

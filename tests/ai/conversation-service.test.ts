@@ -133,7 +133,10 @@ describe("handleCustomerReply", () => {
       const outcome = await handleCustomerReply(lead, "no heat and it is freezing");
 
       expect(outcome.kind).toBe("emergency");
-      expect(sent).toHaveLength(1);
+      // Two sends now: the customer's holding message, and the alert to the
+      // owner. Assert the customer's specifically, so this keeps meaning
+      // "the customer was answered even with the model down".
+      expect(sent.filter((message) => message.to === lead.phone)).toHaveLength(1);
 
       const updated = await prisma.lead.findUniqueOrThrow({ where: { id: lead.id } });
       expect(updated.status).toBe("HUMAN_HANDOFF");

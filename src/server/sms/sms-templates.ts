@@ -12,6 +12,10 @@ export interface MessageVariables {
   time?: string;
   /** Number a customer can call to reach a person, used by the HELP reply. */
   ownerPhone?: string;
+  /** The customer's number, used by the owner alert. */
+  phone?: string;
+  /** What the customer said, used by the owner alert. */
+  message?: string;
 }
 
 const PLACEHOLDER_PATTERN = /\{(\w+)\}/g;
