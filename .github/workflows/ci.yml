@@ -1,0 +1,87 @@
+name: CI
+
+# Every push and every pull request. The suite is only useful if it is
+# unconditional - twice on 2026-08-18 it caught a real regression, and both
+# times only because someone remembered to run it.
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+
+    services:
+      # A real Postgres, not a mock. Every idempotency guarantee in this
+      # codebase is a unique constraint, and a mock cannot enforce one.
+      postgres:
+        image: postgres:16
+        env:
+          POSTGRES_USER: postgres
+          POSTGRES_PASSWORD: postgres
+          POSTGRES_DB: hvac_leads
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U postgres"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 20
+
+    env:
+      # tests/setup.ts derives the test database by suffixing _test, and
+      # refuses to run against anything not named that way - the suite
+      # truncates tables.
+      DATABASE_URL: postgresql://postgres:postgres@localhost:5432/hvac_leads?schema=public
+
+      # The five variables a deployment must supply, asserted by
+      # tests/config/defaults.test.ts. Everything else must default to
+      # something the schema itself accepts.
+      LEAD_WEBHOOK_SECRET: ci-secret-0123456789abcdef
+      BUSINESS_NAME: CI Test Company
+      BUSINESS_COUNTRY_CODE: "+1"
+
+      # Dummy on purpose. getAiProvider() and getSmsProvider() both throw when
+      # NODE_ENV=test, so no request can reach a paid API - but the schema
+      # still requires a key for the selected provider.
+      AI_PROVIDER: anthropic
+      ANTHROPIC_API_KEY: sk-ant-ci-not-a-real-key
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+
+      # ci, not install: installs exactly the lockfile and fails if
+      # package.json and package-lock.json disagree.
+      - name: Install
+        run: npm ci
+
+      - name: Create the test database
+        run: |
+          PGPASSWORD=postgres psql -h localhost -U postgres -c \
+            "CREATE DATABASE hvac_leads_test" || echo "already exists"
+
+      - name: Generate the Prisma client
+        run: node node_modules/prisma/build/index.js generate
+
+      # deploy, not dev: applies committed migrations without ever generating
+      # a new one. CI must never author a migration.
+      - name: Apply migrations
+        env:
+          DATABASE_URL: postgresql://postgres:postgres@localhost:5432/hvac_leads_test?schema=public
+        run: node node_modules/prisma/build/index.js migrate deploy
+
+      - name: Typecheck
+        run: node node_modules/typescript/bin/tsc --noEmit
+
+      - name: Test
+        run: node node_modules/vitest/vitest.mjs run
+
+      # Last, because it is the slowest and the least likely to fail alone.
+      - name: Build
+        run: node node_modules/next/dist/bin/next build

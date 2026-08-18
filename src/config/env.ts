@@ -101,8 +101,15 @@ const baseSchema = z.object({
   BUSINESS_CLOSE_HOUR: z.coerce.number().int().min(1).max(24).default(18),
   /** ISO weekday numbers the business operates, 1=Monday .. 7=Sunday. */
   BUSINESS_OPEN_DAYS: z.string().default("1,2,3,4,5,6"),
-  /** Where the business will travel. The AI must never invent this. */
-  SERVICE_AREA: z.string().min(1).default(""),
+  /**
+   * Where the business will travel. The AI must never invent this.
+   *
+   * Empty is a supported state meaning "not configured" - system-prompt.ts
+   * checks hasServiceArea and omits the line rather than claiming a coverage
+   * area. It carried a .min(1) alongside the empty default, so the default
+   * failed its own rule and a deployment that had not set it could not start.
+   */
+  SERVICE_AREA: z.string().default(""),
   /** Alerted when a conversation is escalated. */
   OWNER_PHONE: z.string().regex(/^\+[1-9]\d{7,14}$/, "must be E.164").optional(),
 
