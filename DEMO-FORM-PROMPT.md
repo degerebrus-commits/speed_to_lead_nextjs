@@ -102,6 +102,9 @@ Send that same string as `smsConsentText`.
 - Keep what the visitor typed on an error. Never clear the form on failure.
 - On success, replace the form with the success state rather than leaving a
   filled form sitting there.
+- Validate `phone` loosely on the client (digits, spaces, `+`, `-`, brackets;
+  at least 7 digits) and let the server do the real check. Do not attempt
+  strict E.164 parsing in the browser.
 
 **A reset control, because this form is used by more than one person.** It sits
 on a public landing page — at a trade stand, or passed around a laptop — so the
@@ -118,9 +121,6 @@ be able to submit them again.
   that is the moment the next person steps up.
 - Resetting must never re-submit or clear the success state without the visitor
   choosing to.
-- Validate `phone` loosely on the client (digits, spaces, `+`, `-`, brackets;
-  at least 7 digits) and let the server do the real check. Do not attempt
-  strict E.164 parsing in the browser.
 
 ## Tone and content
 
