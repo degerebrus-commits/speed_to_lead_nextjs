@@ -101,7 +101,23 @@ Send that same string as `smsConsentText`.
   A double submit creates two leads and sends two texts.
 - Keep what the visitor typed on an error. Never clear the form on failure.
 - On success, replace the form with the success state rather than leaving a
-  filled form sitting there — one demo per visitor is the intent.
+  filled form sitting there.
+
+**A reset control, because this form is used by more than one person.** It sits
+on a public landing page — at a trade stand, or passed around a laptop — so the
+next visitor must not inherit the last one's name and phone number, or worse,
+be able to submit them again.
+
+- A small **"Start over"** control in the **upper right of the form card**,
+  quiet rather than prominent: it must not compete with the submit button.
+- It clears every field, resets the consent control to un-agreed, clears any
+  error, and returns the message field to its pre-filled default.
+- It is **always visible**, not only after a submission — someone who has
+  half-filled the form and changed their mind needs it too.
+- The success state gets its own, larger **"Send another demo"** button, since
+  that is the moment the next person steps up.
+- Resetting must never re-submit or clear the success state without the visitor
+  choosing to.
 - Validate `phone` loosely on the client (digits, spaces, `+`, `-`, brackets;
   at least 7 digits) and let the server do the real check. Do not attempt
   strict E.164 parsing in the browser.
