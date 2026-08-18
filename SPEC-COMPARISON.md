@@ -4,7 +4,7 @@ Comparison of this Next.js implementation against the Express/SQLite backend
 specification on `speed_to_lead_backend@master`. Read alongside
 `PRD-TRACEABILITY.md`.
 
-**Both are the same author's work, from the same idea, built separately:**
+**Both are the same team's work, from one idea, built separately:**
 
 | | `speed_to_lead_backend` | this repo |
 |---|---|---|
@@ -134,6 +134,11 @@ Carry these across from `speed_to_lead_backend`:
    variables. This repo has none, and Railway is on the critical path.
 3. **The Google Calendar design.** Read availability, create, update, cancel.
    Worth following when fixed slots stop being enough.
+
+**Coordinate with luislndch before anything is retired.** They contributed to
+`speed_to_lead_backend`, so the decision to supersede it is not solely this
+repo's to make — and they may hold context on why choices there were made that
+the specification does not record.
 
 Do not force-push either branch over the other. `master` stays as the record of
 the first build; `nextjs-rebuild` carries the second. Merging them is not worth
