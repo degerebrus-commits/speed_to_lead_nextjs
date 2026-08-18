@@ -141,9 +141,21 @@ model Appointment {
 
   status AppointmentStatus @default(CONFIRMED)
 
+  /// When the visit actually happens. Null only for rows booked before this
+  /// column existed, or when the configured label could not be parsed.
+  ///
+  /// Without it a slot label was the whole identity of an appointment, so
+  /// "Mon-Fri 9am" could exist once in the entire database and six configured
+  /// slots meant six bookings ever.
+  scheduledAt    DateTime?
+  scheduledEndAt DateTime?
+
   /// Guards double-booking at the database rather than with a read-then-write.
   /// Two customers choosing the same slot simultaneously would both pass a
   /// SELECT; one of them must lose at the unique index instead.
+  ///
+  /// Now carries the resolved date, so the same weekly window is bookable
+  /// again next week rather than being consumed permanently.
   slotKey String @unique
 
   confirmationSentAt DateTime?
@@ -152,4 +164,6 @@ model Appointment {
 
   @@index([leadId])
   @@index([status, createdAt])
+  /// Drives "what is on tomorrow" without scanning.
+  @@index([scheduledAt])
 }

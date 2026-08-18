@@ -1,6 +1,7 @@
 import { Prisma, type Appointment, type Lead } from "@prisma/client";
 import { getBookingSettings, getBusinessProfile, getMessageTemplates } from "@/config/business";
 import { prisma } from "@/lib/db";
+import { buildScheduledSlotKey, resolveNextOccurrence } from "./slot-schedule";
 import { logger } from "@/lib/logger";
 import { renderTemplate } from "@/server/sms/sms-templates";
 
@@ -84,18 +85,27 @@ export function matchSlotChoice(
 }
 
 /** Slots still free, in configured order. */
-export async function getAvailableSlots(): Promise<string[]> {
+export async function getAvailableSlots(now: Date = new Date()): Promise<string[]> {
   const { fixedSlots } = getBookingSettings();
   if (fixedSlots.length === 0) return [];
 
+  // Only appointments still ahead of us can block a slot. Querying every
+  // appointment ever made was what exhausted the schedule permanently: with
+  // the key derived from the label alone, six configured slots meant six
+  // bookings in the lifetime of the deployment.
   const taken = await prisma.appointment.findMany({
-    where: { status: { in: ["PENDING", "CONFIRMED"] } },
+    where: {
+      status: { in: ["PENDING", "CONFIRMED"] },
+      OR: [{ scheduledAt: { gte: now } }, { scheduledAt: null }],
+    },
     select: { slotKey: true },
   });
 
   const takenKeys = new Set(taken.map((appointment) => appointment.slotKey));
 
-  return fixedSlots.filter((slot) => !takenKeys.has(buildSlotKey(slot)));
+  return fixedSlots.filter(
+    (slot) => !takenKeys.has(buildScheduledSlotKey(slot, resolveNextOccurrence(slot, now))),
+  );
 }
 
 /** The message offering slots, numbered so a reply of "2" is unambiguous. */
@@ -121,7 +131,11 @@ export interface BookingResult {
  * both pass a read-then-write check, and both would be told they had the slot.
  * One of them has to lose at the database instead.
  */
-export async function bookSlot(lead: Lead, slotLabel: string): Promise<BookingResult> {
+export async function bookSlot(
+  lead: Lead,
+  slotLabel: string,
+  now: Date = new Date(),
+): Promise<BookingResult> {
   const { fixedSlots, durationMinutes, mode } = getBookingSettings();
 
   if (mode !== "fixed") {
@@ -132,12 +146,22 @@ export async function bookSlot(lead: Lead, slotLabel: string): Promise<BookingRe
     return { appointment: null, failure: "no-slots", confirmation: null };
   }
 
+  // Resolved once, here, so the stored timestamp and the key that guards it
+  // can never disagree.
+  const scheduledAt = resolveNextOccurrence(slotLabel, now);
+  const scheduledEndAt =
+    scheduledAt === null
+      ? null
+      : new Date(scheduledAt.getTime() + durationMinutes * 60 * 1000);
+
   try {
     const appointment = await prisma.appointment.create({
       data: {
         leadId: lead.id,
         slotLabel,
-        slotKey: buildSlotKey(slotLabel),
+        slotKey: buildScheduledSlotKey(slotLabel, scheduledAt),
+        scheduledAt,
+        scheduledEndAt,
         durationMinutes,
       },
     });
