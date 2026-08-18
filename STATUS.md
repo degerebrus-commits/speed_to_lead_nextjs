@@ -4,15 +4,21 @@ Snapshot as of **2026-08-17**. Read this with `CONTRIBUTING.md` (conventions and
 the single-tenant decision), `MISTAKES.md` (what went wrong here and the rules
 that prevent it), and `STANDARDS.md` (engineering rules).
 
-> **Uncommitted work in the tree.** Phase 5 booking is written and
-> typecheck-clean but was never committed: Docker died before the suite could
-> verify it. It was at 109 passing before the database dropped; the newest
-> booking-flow tests are unverified. Bring Postgres up, run the suite, commit
-> if green.
+> **Phase 5 booking is committed but NOT verified** (`73603d8`). Docker died
+> before the suite could run against it. The suite was at 109 passing when the
+> database dropped; every booking-flow test added after that has never
+> executed. Bring Postgres up and run the suite before building on it.
 
 > **Free disk on C: before doing anything.** It hit 0 bytes and caused most of
-> this session's failures. One command recovers 8.84 GB with no download cost:
-> `Remove-Item "$env:APPDATA\Claudem_bundles\claudevm.bundleootfs.vhdx" -Force`
+> this session's failures — the Docker 500s, the container dropping twice, and
+> a `No space left on device` on a plain `head`. One command recovers 8.84 GB
+> with no download cost, because that file is the expanded copy of a `.zst`
+> archive sitting right beside it:
+>
+> ```powershell
+> Remove-Item "$env:APPDATA\Claude\vm_bundles\claudevm.bundle\rootfs.vhdx" -Force
+> ```
+ootfs.vhdx" -Force`
 
 ---
 
@@ -26,11 +32,13 @@ that prevent it), and `STANDARDS.md` (engineering rules).
 | 3 — SMS inbound | **Code done and verified over the public URL.** Real device capture blocked — see Blockers |
 | 3 — Retry queue | **Done** — `POST /api/leads/retry-intro-sms` drains leads that never got a first message |
 | 4 — AI qualification | **Done**, verified live on `claude-haiku-4-5` |
-| 5 — Booking | **Not started** — config exists, nothing reads it |
+| 5 — Booking | **Built, not verified** — fixed-slot booking committed in `73603d8`; its tests have never run |
 | 6 — Analytics | **Not started** |
 | 7 — Hardening | **Not started** |
 
-**82 tests passing**, typecheck clean, production build succeeds.
+**109 tests were passing** when the database dropped mid-run. The booking-flow
+tests added after that point are unverified, so treat the current count as
+unknown until the suite runs clean. Typecheck passes.
 
 ---
 
@@ -53,7 +61,7 @@ that prevent it), and `STANDARDS.md` (engineering rules).
 
 ## Outstanding work, in priority order
 
-1. **Phase 5 — booking.** Smaller than the PRD assumes: `BOOKING_MODE=fixed` with configured slots means **no Google Calendar is needed for MVP**. Offer slots → take a pick → write an `Appointment` row → send `SMS_BOOKING_CONFIRMATION_TEMPLATE`. Calendar becomes a later swap behind an interface, as with SMS and AI.
+1. **Verify Phase 5.** The code is written and committed; nothing about it has been run. Start Postgres, run the suite, fix what falls out. Double-booking is prevented by a unique constraint on `slotKey` rather than an availability check, and `matchSlotChoice` returns null on an ambiguous reply rather than guessing — both are worth confirming under test before trusting them.
 2. **Phases 2 + 6 together.** The lead list, conversation view, and metrics are one screen's worth of work. Doing 6 first would ship a dashboard whose booking-rate, appointment-volume, and completion-rate metrics are structurally zero.
 3. **Amend `STANDARDS.md` §13/§14/§15/§57.3.** They mandate multi-tenancy and OWNER/ADMIN/STAFF roles, which this build deliberately does not have. Left untouched pending permission; until amended the contradiction resurfaces every session.
 
