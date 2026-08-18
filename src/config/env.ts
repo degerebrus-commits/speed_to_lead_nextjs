@@ -141,6 +141,14 @@ const baseSchema = z.object({
   SMS_HELP_TEMPLATE: z.string().min(1).default(
     "{businessName}: this is an automated assistant for booking service visits. Call {ownerPhone} to reach a person. Reply STOP to opt out. Msg & data rates may apply.",
   ),
+  /** Confirms a cancellation. Must state plainly that nothing is booked now. */
+  SMS_CANCELLATION_TEMPLATE: z.string().min(1).default(
+    "That's cancelled - nothing is booked for you now. Reply any time if you'd like to arrange another visit.",
+  ),
+  /** Sent when a customer asks to cancel but has no appointment. */
+  SMS_NOTHING_TO_CANCEL_TEMPLATE: z.string().min(1).default(
+    "You don't have a visit booked with {businessName} at the moment, so there's nothing to cancel.",
+  ),
   AFTER_HOURS_REPLY_ENABLED: z.enum(["true", "false"]).default("true"),
 
   // --- Booking (Phase 5) ---------------------------------------------------

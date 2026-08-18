@@ -13,6 +13,11 @@ import {
   hasBookingIntent,
   matchSlotChoice,
 } from "@/server/booking/booking-service";
+import {
+  cancelAppointment,
+  detectAppointmentIntent,
+  findActiveAppointment,
+} from "@/server/booking/appointment-changes";
 import { detectEmergency } from "@/server/sms/emergency-detection";
 import { renderTemplate } from "@/server/sms/sms-templates";
 import { sendConversationSms, sendOwnerEmergencyAlert } from "@/server/sms/sms-service";
@@ -20,7 +25,15 @@ import { generateQualificationReply } from "./ai-service";
 import { isWithinBusinessHours } from "./business-hours";
 
 /** What the system decided to do with an inbound message. */
-export type ReplyKind = "emergency" | "after-hours" | "slots-offered" | "booked" | "ai" | "none";
+export type ReplyKind =
+  | "emergency"
+  | "after-hours"
+  | "slots-offered"
+  | "booked"
+  | "cancelled"
+  | "nothing-to-cancel"
+  | "ai"
+  | "none";
 
 export interface ConversationOutcome {
   kind: ReplyKind;
@@ -48,9 +61,13 @@ function renderBusinessTemplate(template: string): string {
  *   1. Opted out - never message again, whatever else is true.
  *   2. Emergency - decided by keyword matching in code, so it still works when
  *      the AI provider is down. Short-circuits everything else.
- *   3. After hours - a fixed, honest holding message rather than an assistant
+ *   3. Cancel or reschedule - before booking, because "move me to Thursday"
+ *      contains a word slot matching would read as a fresh selection.
+ *   4. Booking - deterministic, and ahead of after-hours so a customer can
+ *      book at 2am rather than receive an apology.
+ *   5. After hours - a fixed, honest holding message rather than an assistant
  *      implying someone is available.
- *   4. Otherwise, qualification by the model.
+ *   6. Otherwise, qualification by the model.
  */
 export async function handleCustomerReply(
   lead: Lead,
@@ -106,7 +123,63 @@ export async function handleCustomerReply(
     return { kind: "emergency", reply, escalated: true };
   }
 
-  // --- 2. Booking ---------------------------------------------------------
+  // --- 2. Cancel or reschedule --------------------------------------------
+  // Ahead of booking on purpose. "cancel" carries no digit, but "move me to
+  // Thursday" does, and slot matching would read it as a fresh selection
+  // rather than a request to change an existing visit.
+  const change = detectAppointmentIntent(inboundBody);
+
+  if (change !== null) {
+    const existing = await findActiveAppointment(lead);
+
+    if (existing === null) {
+      // Say so rather than confirming a cancellation that never happened.
+      const reply = renderBusinessTemplate(templates.nothingToCancel);
+      await sendConversationSms(lead, reply);
+
+      logger.info("Change requested with no active appointment", {
+        leadId: lead.id,
+        intent: change,
+      });
+      return { kind: "nothing-to-cancel", reply, escalated: false };
+    }
+
+    await cancelAppointment(lead);
+
+    if (change === "cancel") {
+      const reply = renderBusinessTemplate(templates.cancellation);
+      await sendConversationSms(lead, reply);
+
+      await prisma.lead.update({ where: { id: lead.id }, data: { status: "QUALIFIED" } });
+
+      logger.info("Appointment cancelled at customer request", { leadId: lead.id });
+      return { kind: "cancelled", reply, escalated: false };
+    }
+
+    // Reschedule: the old slot is released first, so it can be re-offered to
+    // this customer rather than looking taken by their own booking.
+    const remaining = await getAvailableSlots();
+
+    const reply =
+      remaining.length > 0
+        ? `No problem, I've released that time. ${buildSlotOffer(remaining)}`
+        : "No problem, I've released that time. I have nothing else free right now - the team will call you to sort another.";
+
+    await sendConversationSms(lead, reply);
+
+    await prisma.lead.update({
+      where: { id: lead.id },
+      data: { status: remaining.length > 0 ? "APPOINTMENT_PENDING" : "HUMAN_HANDOFF" },
+    });
+
+    logger.info("Appointment released for reschedule", {
+      leadId: lead.id,
+      slotsOffered: remaining.length,
+    });
+    return { kind: "slots-offered", reply, escalated: false };
+  }
+
+  // --- 3. Booking ---------------------------------------------------------
   // Runs before the model. Whether an appointment exists is a fact about the
   // database, not a judgement the model is allowed to make (STANDARDS.md 2.3,
   // 57.5) - a customer must never be told they are booked when they are not.
@@ -178,7 +251,7 @@ export async function handleCustomerReply(
     }
   }
 
-  // --- 3. After hours -----------------------------------------------------
+  // --- 4. After hours -----------------------------------------------------
   if (!isWithinBusinessHours() && isAfterHoursReplyEnabled()) {
     const reply = renderBusinessTemplate(templates.afterHours);
     await sendConversationSms(lead, reply);
@@ -187,7 +260,7 @@ export async function handleCustomerReply(
     return { kind: "after-hours", reply, escalated: false };
   }
 
-  // --- 4. Qualification ---------------------------------------------------
+  // --- 5. Qualification ---------------------------------------------------
   const history = await prisma.message.findMany({
     where: { leadId: lead.id },
     orderBy: { createdAt: "asc" },
