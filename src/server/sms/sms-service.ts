@@ -6,7 +6,7 @@ import { logger } from "@/lib/logger";
 import { consoleSmsProvider } from "./console-sms-provider";
 import { textBeeSmsProvider } from "./textbee-sms-provider";
 import type { SmsProvider } from "./sms-provider";
-import { buildIntroMessage } from "./sms-templates";
+import { buildIntroMessage, renderTemplate } from "./sms-templates";
 
 let providerOverride: SmsProvider | null = null;
 
@@ -42,7 +42,7 @@ export function getSmsProvider(): SmsProvider {
 export class SmsSuppressedError extends Error {
   constructor(
     message: string,
-    readonly reason: "opted-out" | "quota-exhausted",
+    readonly reason: "opted-out" | "quota-exhausted" | "no-consent",
   ) {
     super(message);
     this.name = "SmsSuppressedError";
@@ -99,6 +99,17 @@ export async function sendIntroSms(lead: Lead): Promise<void> {
     throw new SmsSuppressedError(
       `Lead ${lead.id} has opted out of SMS`,
       "opted-out",
+    );
+  }
+
+  // No recorded consent, no message. Express written consent is what makes an
+  // automated text lawful, and it is what the A2P 10DLC registration is audited
+  // against - a lead whose form did not carry a consent tick is stored and
+  // surfaced on the dashboard for a human to call instead.
+  if (!lead.smsConsentAt) {
+    throw new SmsSuppressedError(
+      `Lead ${lead.id} has no recorded SMS consent`,
+      "no-consent",
     );
   }
 
@@ -178,4 +189,48 @@ export async function sendConversationSms(lead: Lead, body: string): Promise<voi
     provider: result.provider,
     providerMessageId: result.providerMessageId,
   });
+}
+
+/**
+ * The fixed reply to HELP.
+ *
+ * Deliberately bypasses both the opt-out and consent guards, which is the only
+ * send in the system that does. HELP is a reply to a message the customer just
+ * sent us, and the disclosure they agreed to promises an answer - someone who
+ * has opted out is precisely the person likely to text HELP asking how to reach
+ * a human, and silence would be the wrong answer both to them and to a
+ * regulator. Quota still applies: an exhausted gateway cannot send anything.
+ */
+export async function sendHelpReply(lead: Lead): Promise<void> {
+  const provider = getSmsProvider();
+
+  if (provider.name !== "console") {
+    await assertMonthlyQuotaRemaining(provider.name);
+  }
+
+  const business = getBusinessProfile();
+  const body = renderTemplate(getMessageTemplates().help, {
+    firstName: lead.name.split(/\s+/)[0] ?? lead.name,
+    businessName: business.name,
+    repName: business.repName,
+    // Falls back to the business name when no owner phone is configured, so
+    // the reply never ships a customer a literal "{ownerPhone}".
+    ownerPhone: business.ownerPhone ?? business.name,
+  });
+
+  const result = await provider.send({ to: lead.phone, body });
+
+  await prisma.message.create({
+    data: {
+      leadId: lead.id,
+      direction: "OUTBOUND",
+      phone: lead.phone,
+      body,
+      providerMessageId: result.providerMessageId,
+      provider: result.provider,
+      sentAt: new Date(),
+    },
+  });
+
+  logger.info("HELP reply sent", { leadId: lead.id, provider: result.provider });
 }

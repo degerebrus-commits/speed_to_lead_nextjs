@@ -18,6 +18,11 @@ const VALID_BODY = {
   email: "john.carter@example.com",
   serviceAddress: "42 Oak Street, Austin, TX 78701",
   message: "My AC is running but the house is not getting cool.",
+  // A form that ticks the consent box, which is what makes the intro SMS
+  // lawful. Without it nothing sends, so these cases would pass vacuously.
+  smsConsent: true,
+  smsConsentText:
+    "By submitting this form and signing up for texts, you consent to receive text messages...",
 };
 
 function buildRequest(body: unknown, headers: Record<string, string> = {}): Request {

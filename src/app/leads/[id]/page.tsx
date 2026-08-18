@@ -49,6 +49,17 @@ export default async function LeadDetailPage({
             can override that.
           </p>
         </div>
+      ) : lead.smsConsentAt === null ? (
+        <div className="notice notice-bad" role="status">
+          <h3>No SMS consent on record — nothing has been texted.</h3>
+          <p>
+            This lead arrived without a consent tick, so the introductory text
+            was held rather than sent. Call them on {lead.phone} instead, and
+            check that the website form carries the consent line — an automated
+            text without recorded consent is not lawful, and the A2P
+            registration is audited against it.
+          </p>
+        </div>
       ) : lead.introSmsSentAt === null ? (
         <div className="notice notice-warn" role="status">
           <h3>No introductory text has been sent.</h3>

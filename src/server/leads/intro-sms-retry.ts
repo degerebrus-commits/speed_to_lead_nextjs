@@ -44,6 +44,10 @@ export async function retryPendingIntroSms(
       // Belt and braces: this keeps them out of the batch count entirely, so
       // the numbers reported describe real work rather than known no-ops.
       smsOptedOutAt: null,
+      // Same reasoning for consent. A lead whose form carried no consent tick
+      // is never sendable, so counting it as "attempted" every run would
+      // report permanent failures as if they were transient ones.
+      smsConsentAt: { not: null },
     },
     // Oldest first - a lead that has been waiting longest is the most urgent,
     // and the whole product promise is speed of first response.

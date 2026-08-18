@@ -42,6 +42,12 @@ export async function createLead(input: LeadWebhookInput): Promise<CreateLeadRes
         serviceAddress: input.serviceAddress,
         initialMessage: input.message,
         dedupeKey,
+        // Stamped server-side at the moment of submission rather than taken
+        // from the payload: a consent timestamp the caller could choose is
+        // not evidence of anything.
+        smsConsentAt: input.smsConsent === true ? new Date() : null,
+        smsConsentText: input.smsConsent === true ? (input.smsConsentText ?? null) : null,
+        smsConsentSource: input.smsConsent === true ? "website-form" : null,
       },
     });
 

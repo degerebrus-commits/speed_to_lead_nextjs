@@ -181,6 +181,29 @@ describe("POST /api/webhooks/sms", () => {
       expect(updated.smsOptedOutAt).not.toBeNull();
     });
 
+    it("answers HELP from the route, without involving the model", async () => {
+      // The unit test for sendHelpReply passes even if the route never calls
+      // it, so this asserts the wiring: HELP in, a fixed reply out.
+      const lead = await seedLead();
+      await prisma.lead.update({
+        where: { id: lead.id },
+        data: { smsConsentAt: new Date() },
+      });
+
+      const response = await POST(
+        buildRequest(buildPayload({ data: { _id: "help-1", message: "HELP" } })),
+      );
+
+      expect(response.status).toBe(200);
+      expect((await response.json()).reply).toBe("help");
+
+      const outbound = await prisma.message.findMany({
+        where: { leadId: lead.id, direction: "OUTBOUND" },
+      });
+      expect(outbound).toHaveLength(1);
+      expect(outbound[0].body).toContain("STOP");
+    });
+
     it("applies the opt-out to every lead sharing that number", async () => {
       // Lead.phone is not unique: a customer who submitted the form twice has
       // several rows. Marking only the newest left the older ones eligible for

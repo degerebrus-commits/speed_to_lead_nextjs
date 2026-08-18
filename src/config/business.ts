@@ -47,6 +47,7 @@ export interface MessageTemplates {
   afterHours: string;
   emergency: string;
   bookingConfirmation: string;
+  help: string;
 }
 
 export interface BookingSettings {
@@ -82,6 +83,7 @@ export function getMessageTemplates(): MessageTemplates {
     afterHours: env.SMS_AFTER_HOURS_TEMPLATE,
     emergency: env.SMS_EMERGENCY_TEMPLATE,
     bookingConfirmation: env.SMS_BOOKING_CONFIRMATION_TEMPLATE,
+    help: env.SMS_HELP_TEMPLATE,
   };
 }
 

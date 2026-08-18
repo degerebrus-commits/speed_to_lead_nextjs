@@ -77,6 +77,15 @@ const baseSchema = z.object({
   SMS_BOOKING_CONFIRMATION_TEMPLATE: z.string().min(1).default(
     "You're all set! Your appointment with {businessName} is confirmed for {time}. Reply STOP to opt out.",
   ),
+  /**
+   * Reply to HELP. Required by CTIA guidelines and by the consent disclosure
+   * the customer agreed to on the form ("Reply HELP for help"), so it must
+   * identify the business and repeat how to opt out. Answered from code, never
+   * by the model - a compliance reply is not a judgement call.
+   */
+  SMS_HELP_TEMPLATE: z.string().min(1).default(
+    "{businessName}: this is an automated assistant for booking service visits. Call {ownerPhone} to reach a person. Reply STOP to opt out. Msg & data rates may apply.",
+  ),
   AFTER_HOURS_REPLY_ENABLED: z.enum(["true", "false"]).default("true"),
 
   // --- Booking (Phase 5) ---------------------------------------------------

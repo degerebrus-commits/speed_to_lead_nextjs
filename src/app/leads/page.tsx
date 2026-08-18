@@ -111,7 +111,12 @@ export default async function LeadsPage({
                           <span className="badge badge-bad">Opted out</span>
                         </>
                       ) : null}
-                      {lead.introSmsSentAt === null && lead.smsOptedOutAt === null ? (
+                      {lead.smsConsentAt === null ? (
+                        <>
+                          {" "}
+                          <span className="badge badge-bad">No SMS consent</span>
+                        </>
+                      ) : lead.introSmsSentAt === null && lead.smsOptedOutAt === null ? (
                         <>
                           {" "}
                           <span className="badge badge-warn">Awaiting first text</span>

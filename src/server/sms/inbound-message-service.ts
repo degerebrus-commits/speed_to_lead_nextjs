@@ -41,14 +41,21 @@ const OPT_OUT_KEYWORDS = new Set(["stop", "stopall", "unsubscribe", "end", "quit
 const OPT_IN_KEYWORDS = new Set(["start", "unstop"]);
 
 /**
+ * Keywords that must get the fixed HELP reply. Required by CTIA guidelines and
+ * promised in the consent disclosure the customer agreed to on the form.
+ */
+const HELP_KEYWORDS = new Set(["help", "info"]);
+
+/**
  * Compares only the first word, case-insensitively, ignoring punctuation.
  * "STOP" and "Stop." must both count; "please stop by tomorrow" must not.
  */
-function classifyKeyword(body: string): "opt-out" | "opt-in" | null {
+function classifyKeyword(body: string): "opt-out" | "opt-in" | "help" | null {
   const [firstWord = ""] = body.trim().toLowerCase().replace(/[^\w\s]/g, "").split(/\s+/);
 
   if (OPT_OUT_KEYWORDS.has(firstWord)) return "opt-out";
   if (OPT_IN_KEYWORDS.has(firstWord)) return "opt-in";
+  if (HELP_KEYWORDS.has(firstWord)) return "help";
   return null;
 }
 
@@ -57,7 +64,7 @@ export interface InboundResult {
   isNew: boolean;
   messageId: string;
   leadId: string | null;
-  keyword: "opt-out" | "opt-in" | null;
+  keyword: "opt-out" | "opt-in" | "help" | null;
 }
 
 /**
@@ -108,7 +115,9 @@ export async function handleInboundMessage(
       },
     });
 
-    if (keyword) {
+    // HELP changes no consent state - it is a request for information, and
+    // answering it is handled by the caller.
+    if (keyword === "opt-out" || keyword === "opt-in") {
       // Applied to the number, not to one lead row. Lead.phone is indexed but
       // not unique - a customer who submitted the form twice has several rows -
       // and consent belongs to the person, not to whichever row happens to be

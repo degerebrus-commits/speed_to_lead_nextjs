@@ -56,6 +56,21 @@ model Lead {
   /// once set, nothing may text this lead again.
   smsOptedOutAt DateTime?
 
+  /// When the customer agreed to be texted. Null means no consent was recorded
+  /// and nothing may be sent to them: express written consent is what makes an
+  /// automated text lawful, and it is also what the A2P 10DLC registration is
+  /// audited against.
+  smsConsentAt DateTime?
+
+  /// The disclosure the customer actually agreed to, stored verbatim. The
+  /// wording changes over time, and "they consented" is only defensible if we
+  /// can produce what they consented to.
+  smsConsentText String? @db.Text
+
+  /// Where consent came from, e.g. "website-form". Distinguishes a form tick
+  /// from consent captured any other way.
+  smsConsentSource String?
+
   messages     Message[]
   appointments Appointment[]
 

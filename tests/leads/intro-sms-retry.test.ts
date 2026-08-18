@@ -30,6 +30,11 @@ async function seedLead(overrides: Record<string, unknown> = {}) {
       serviceAddress: "1 Test Street",
       initialMessage: `message ${seq}`,
       dedupeKey: `dedupe-${seq}-${Date.now()}-${Math.random()}`,
+      // Consented by default: this suite is about the retry mechanism, and a
+      // lead without consent is never sendable, so leaving it null here would
+      // make every case pass for the wrong reason.
+      smsConsentAt: new Date(),
+      smsConsentSource: "website-form",
       ...overrides,
     },
   });

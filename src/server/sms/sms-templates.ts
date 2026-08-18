@@ -10,6 +10,8 @@ export interface MessageVariables {
   repName?: string;
   /** Appointment time, used by the booking confirmation copy in Phase 5. */
   time?: string;
+  /** Number a customer can call to reach a person, used by the HELP reply. */
+  ownerPhone?: string;
 }
 
 const PLACEHOLDER_PATTERN = /\{(\w+)\}/g;

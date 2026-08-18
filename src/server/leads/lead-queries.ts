@@ -11,6 +11,8 @@ export interface LeadListItem {
   createdAt: Date;
   introSmsSentAt: Date | null;
   smsOptedOutAt: Date | null;
+  /** Null means no consent recorded, so nothing may be texted to them. */
+  smsConsentAt: Date | null;
   /** Preview text for the row, taken from the most recent message. */
   lastMessageBody: string | null;
   lastMessageAt: Date | null;
@@ -55,6 +57,9 @@ export interface LeadDetail {
   createdAt: Date;
   introSmsSentAt: Date | null;
   smsOptedOutAt: Date | null;
+  smsConsentAt: Date | null;
+  smsConsentText: string | null;
+  smsConsentSource: string | null;
   messages: ConversationMessage[];
   appointments: LeadAppointment[];
 }
@@ -85,6 +90,7 @@ export async function listLeads(options?: {
         createdAt: true,
         introSmsSentAt: true,
         smsOptedOutAt: true,
+        smsConsentAt: true,
         // One message and one appointment per lead, rather than a count query
         // per row: the list is the most-visited screen and N+1 here would be
         // felt immediately.
@@ -111,6 +117,7 @@ export async function listLeads(options?: {
       createdAt: row.createdAt,
       introSmsSentAt: row.introSmsSentAt,
       smsOptedOutAt: row.smsOptedOutAt,
+      smsConsentAt: row.smsConsentAt,
       lastMessageBody: row.messages[0]?.body ?? null,
       lastMessageAt: row.messages[0]?.createdAt ?? null,
       hasAppointment: row.appointments.length > 0,
@@ -141,6 +148,9 @@ export async function getLeadDetail(id: string): Promise<LeadDetail | null> {
       createdAt: true,
       introSmsSentAt: true,
       smsOptedOutAt: true,
+      smsConsentAt: true,
+      smsConsentText: true,
+      smsConsentSource: true,
       messages: {
         orderBy: { createdAt: "asc" },
         select: {

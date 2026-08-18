@@ -9,6 +9,7 @@ import {
   handleInboundMessage,
   inboundMessageSchema,
 } from "@/server/sms/inbound-message-service";
+import { sendHelpReply } from "@/server/sms/sms-service";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -146,6 +147,28 @@ export async function POST(request: Request): Promise<Response> {
     // Only a genuinely new message from a known lead earns a reply. A
     // redelivered webhook must not produce a second text, and an opt-out
     // keyword is an instruction rather than a conversation turn.
+    // HELP is answered from a template before anything else, and regardless of
+    // opt-out state: the disclosure the customer agreed to promises a reply,
+    // and someone who has opted out is exactly the person likely to ask how to
+    // reach a human. It never reaches the model - a compliance reply is fixed
+    // text, not a judgement call.
+    if (result.isNew && result.leadId && result.keyword === "help") {
+      const lead = await prisma.lead.findUnique({ where: { id: result.leadId } });
+
+      if (lead) {
+        try {
+          await sendHelpReply(lead);
+          replyKind = "help";
+        } catch (error) {
+          logger.error("Failed to send HELP reply", {
+            leadId: lead.id,
+            reason: error instanceof Error ? error.message : String(error),
+          });
+          replyKind = "failed";
+        }
+      }
+    }
+
     if (result.isNew && result.leadId && result.keyword === null) {
       const lead = await prisma.lead.findUnique({ where: { id: result.leadId } });
 
