@@ -4,7 +4,7 @@ Comparison of this Next.js implementation against the Express/SQLite backend
 specification on `speed_to_lead_backend@master`. Read alongside
 `PRD-TRACEABILITY.md`.
 
-**Both are the same team's work, from one idea, built separately:**
+**Two people building the same idea in parallel, separately:**
 
 | | `speed_to_lead_backend` | this repo |
 |---|---|---|
@@ -115,15 +115,13 @@ Worth noting, because independent agreement is evidence:
 
 ## Recommendation
 
-**Consolidate on this build, and port three things from the other.**
+**These are parallel efforts, not a replacement and a legacy.** luislndch is
+building `speed_to_lead_backend`; this repo is the other build. Neither should
+be retired on the strength of this document, and neither belongs as a branch of
+the other — they are separate codebases and get separate repositories.
 
-This is the one that should go to a client. It has the compliance work without
-which the system cannot lawfully send a single text — consent capture, STOP,
-HELP — none of which appears in the specification. It has idempotency enforced
-by unique constraints rather than a read-then-write. And it has 177 tests, so a
-change can be made without wondering what broke.
-
-Carry these across from `speed_to_lead_backend`:
+What this comparison is actually for is cross-pollination. Three things are
+worth taking from that build:
 
 1. **The tool-use idea, in hybrid form.** A `record_qualification` tool the
    model calls to hand back issue, urgency and address as typed fields. That
@@ -135,15 +133,18 @@ Carry these across from `speed_to_lead_backend`:
 3. **The Google Calendar design.** Read availability, create, update, cancel.
    Worth following when fixed slots stop being enough.
 
-**Coordinate with luislndch before anything is retired.** They contributed to
-`speed_to_lead_backend`, so the decision to supersede it is not solely this
-repo's to make — and they may hold context on why choices there were made that
-the specification does not record.
+And three are worth sending the other way, because they are correctness issues
+rather than preferences:
 
-Do not force-push either branch over the other. `master` stays as the record of
-the first build; `nextjs-rebuild` carries the second. Merging them is not worth
-it — the histories are unrelated and the overlap is conceptual, not textual.
+1. **No uniqueness on `leads`.** A redelivered form submission creates a second
+   lead and sends a second text. `Lead.dedupeKey` exists here for exactly this.
+2. **Calendar conflict detection is a read-then-write.** Two simultaneous
+   replies both pass it. A unique constraint is the only thing that does not
+   race.
+3. **No consent capture, STOP, or HELP.** Without a consent record the system
+   cannot lawfully send an automated text, and A2P 10DLC registration will not
+   pass. This is the one that blocks going live, whichever build gets there
+   first.
 
 The honest summary: **this build is more robust, that one is better specified,
-and the specification is worth keeping as a design document even after its code
-stops being the product.**
+and both would be better for reading the other's notes.**
