@@ -71,21 +71,22 @@ every line past the signature check. Likely moot if the client provides Twilio.
 
 ## Outstanding, in priority order
 
-1. **A Dockerfile and deployment config.** None exists, and Railway is the
-   documented target. `SPEC-COMPARISON.md` notes the Express build has this
-   already and it is worth following. This is the only thing between a working
-   application and a deployed one.
-2. **Structured qualification.** Urgency, property type and preferred time are
+1. **Structured qualification.** Urgency, property type and preferred time are
    discussed with the customer and then left in message text, unqueryable. The
    other build's `record_qualification` tool idea closes this - the model
    extracts, the code still executes. Do not give it `book_appointment`.
-3. **An upcoming-appointments view.** Appointments now carry `scheduledAt`, so
+2. **An upcoming-appointments view.** Appointments now carry `scheduledAt`, so
    "what is on tomorrow" is finally answerable and nothing displays it.
-4. **Google Calendar.** The largest PRD divergence, and genuinely optional
+3. **Google Calendar.** The largest PRD divergence, and genuinely optional
    while fixed slots serve the MVP. Needs the timestamps that now exist.
-5. **`STANDARDS.md` §13/§14/§15/§57.3.** They mandate multi-tenancy and
+4. **`STANDARDS.md` §13/§14/§15/§57.3.** They mandate multi-tenancy and
    OWNER/ADMIN/STAFF roles, which this build deliberately does not have. Still
    untouched pending permission; the contradiction resurfaces every session.
+
+**Deployment is ready but has never been deployed.** `DEPLOYMENT.md`, a
+multi-stage Dockerfile on Next's standalone output, an entrypoint that applies
+migrations before serving, and `GET /api/health` which queries the database and
+returns 503 when it cannot. The image builds; nothing has run on Railway yet.
 
 ### Done since this file was last written
 
@@ -100,31 +101,28 @@ and scrubs secret *values* rather than only key names.
 
 ## Known issues
 
-**The suite fails intermittently on this machine, roughly one run in three.**
-Always a timeout in the metrics specs. Diagnosed 2026-08-18 and it is not a
-code defect: sampling Postgres during a failing run showed zero lock waits,
-zero idle-in-transaction sessions, 11 of 100 connections and 0% container CPU
-- the database is idle while the client times out. The machine has ~1.8 GB of
-6.9 GB free with over a gigabyte paged out, so a vitest fork gets descheduled
-long enough to blow the timeout while doing no work. Windows Defender
-(`MsMpEng`) scanning `node_modules` compounds it.
+**The suite is occasionally flaky on this machine** - roughly one run in five,
+always in the heaviest specs.
 
-The metrics specs lose because they are the heaviest - five concurrent queries
-in one `Promise.all` - so they hold the widest window to be interrupted in.
+Diagnosed 2026-08-18. It was never a vitest timeout: failures landed
+consistently at 5.1-5.3s, which is **Prisma's connection-pool timeout**, and
+`getDashboardMetrics` issues five queries in one `Promise.all` while the whole
+suite shares a single fork. Postgres was idle throughout - zero lock waits,
+zero idle-in-transaction sessions, 11 of 100 connections, 0% container CPU.
 
-Two changes were made while diagnosing and are kept on their own merits: the
-test timeout is 20s rather than vitest's 5s, and `tests/setup.ts` no longer
-disconnects Prisma after every file (setup files run per file, and the suite
-shares one fork, so it was tearing down the pool two dozen times a run).
-Neither cured it, because neither was the cause.
+`tests/setup.ts` now sets `connection_limit=25` and `pool_timeout=20` on the
+test database URL, which took it from failing two runs in three to one in five.
+The remainder is this machine: ~1.8 GB of 6.9 GB free with a gigabyte paged
+out, and Defender scanning `node_modules`.
 
-**Confirmed by CI: eight runs, eight green**, including the three pushed while
-local runs were still flaking. The same suite that fails one run in three here
-passes every time on a clean runner in about 75 seconds.
+Two changes made while diagnosing are kept on their own merits but were not the
+cause: the 20s test timeout, and `tests/setup.ts` no longer disconnecting Prisma
+after every file.
 
-**So CI is the honest signal, not the local run.** A red local run against a
-green CI means the machine did it - close Chrome, or exclude this folder from
-Windows Defender. Chase the code only when CI itself goes red.
+**CI is the honest signal: eight runs, eight green**, including three pushed
+while local runs were failing. A red local run against a green CI means the
+machine - close Chrome, or exclude this folder from Defender. Chase the code
+only when CI itself goes red.
 
 **`Firstline-Landing-Package.html` is untracked at the repo root**, newer than
 the copy in the landing repo. It belongs there, not here.

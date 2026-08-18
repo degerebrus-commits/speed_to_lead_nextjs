@@ -18,6 +18,14 @@ function deriveTestDatabaseUrl(databaseUrl: string): string {
     parsed.pathname = `${parsed.pathname}_test`;
   }
 
+  // Prisma sizes its pool at (cpus * 2 + 1) and gives up after five seconds of
+  // waiting for a connection. getDashboardMetrics issues five queries in one
+  // Promise.all, and with the whole suite in a single fork that was enough to
+  // exhaust the pool - failures landed at 5.1-5.3s, which is the pool timeout,
+  // not vitest's. Postgres allows 100 connections and the suite was using 11.
+  parsed.searchParams.set("connection_limit", "25");
+  parsed.searchParams.set("pool_timeout", "20");
+
   return parsed.toString();
 }
 
