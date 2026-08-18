@@ -59,10 +59,27 @@ not pass without the consent line live on the client's form. This is the
 critical path to going live — see `CLIENT-REQUIREMENTS.md`, which is written
 for the client to read directly.
 
-**The TextBee app on the Redmi does not capture incoming SMS.** Everything
-downstream is proven; `receivedSMSCount` never increments. A device problem,
-not a code problem — a signed POST is indistinguishable from a real delivery to
-every line past the signature check. Likely moot if the client provides Twilio.
+**The Redmi handset now fails in both directions, and TextBee is not a
+production path.**
+
+Inbound was never captured - `receivedSMSCount` never increments - and on
+2026-08-18 outbound stopped too: three messages were dispatched by TextBee at
+11:56 and **none arrived on the phone**, despite a real text landing
+successfully the day before. TextBee does not send SMS itself; it queues to the
+app on the handset, so "dispatched" only means the device accepted the job.
+Suspect MIUI battery optimisation killing the app, lost SMS permission, or the
+device being offline.
+
+Neither is a code problem - every line past the signature check cannot tell a
+signed POST from a real delivery, and the full booking flow was proven that way
+on 2026-08-18: lead captured with consent, slots offered, `Mon-Fri 2pm` booked,
+appointment stored, dashboard updated.
+
+**The conclusion is about the approach, not the device.** A system whose promise
+is replying within five minutes cannot depend on a phone staying awake with an
+app alive. `Checklist.md` specified Twilio from the start; this is the evidence
+for it. Until then keep `SMS_PROVIDER=console`, which logs instead of sending
+and costs nothing.
 
 **The OpenAI account has no credit.** `AI_PROVIDER=openai` fails with
 `insufficient_quota`; `anthropic` works.
