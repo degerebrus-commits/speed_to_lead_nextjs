@@ -142,8 +142,11 @@ while local runs were failing. A red local run against a green CI means the
 machine - close Chrome, or exclude this folder from Defender. Chase the code
 only when CI itself goes red.
 
-**`Firstline-Landing-Package.html` is untracked at the repo root**, newer than
-the copy in the landing repo. It belongs there, not here.
+**`Firstline-Landing-Package.html` is untracked at the repo root. Do not push
+it to the landing repo.** It is a *stale* export: unpacking its gzipped base64
+shows the pre-fix calculator disclaimer, so pushing it would silently revert
+0282f48 with a diff that looks like nothing but regenerated UUIDs. Re-export
+from Claude Design if a fresh bundle is wanted; otherwise delete it.
 
 **An unknown lead id returns HTTP 200** rather than 404, while correctly
 rendering the "Lead not found" page. Removing the loading boundary did not
