@@ -13,6 +13,48 @@ recurring symptom as flakiness instead of finding its cause**.
 
 ---
 
+## Leaked a secret by building a URL out of it, after saying I would not
+
+**What happened.** I generated the SMS Gate webhook secret, wrote it to `.env`
+without printing it, said so - and then printed the assembled webhook URL,
+which contains the secret. Third leak on this project.
+
+**Root cause.** I was guarding the *variable*, not the *value*. Reading a secret
+back out of a file and concatenating it into something else is printing it; the
+string being a URL changes nothing.
+
+**The correct fix.** Rotated it - it had not been configured anywhere yet, so
+nothing was at risk - and handed over a command for the user to run locally,
+so the assembled URL never entered the transcript.
+
+**Prevention rule.** A value derived from a secret is the secret. Never
+construct output from one; print a command that constructs it on the user's
+machine instead. This is the same rule as the two earlier leaks, which is why
+it is now the third entry rather than a new lesson.
+
+---
+
+## A test that passed in the morning and failed after lunch
+
+**What happened.** The cancellation specs booked an appointment at a fixed
+instant (`2026-08-18T12:00Z`, resolving to 14:00Z) while
+`findActiveAppointment` filters against the real clock. They passed all
+morning. Once the wall clock passed 14:00Z the appointment counted as already
+happened, could not be cancelled, and four specs went red - looking like the
+SMS Gate work had broken cancellation, which it had not.
+
+**Root cause.** Half the test was on a simulated clock and half on the real one.
+
+**The correct fix.** Book relative to `new Date()` so the resolved slot is
+always ahead of now.
+
+**Prevention rule.** If the code under test reads the real clock, the test must
+too - or inject the clock into both. A fixed date in one half and `Date.now()`
+in the other is a test with an expiry time, and it will fail in CI overnight
+looking like a regression in whatever landed last.
+
+---
+
 ## Three wrong diagnoses before finding the real one
 
 **What happened.** The suite failed about one run in three. I blamed, in order:
