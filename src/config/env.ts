@@ -50,6 +50,20 @@ const baseSchema = z.object({
   /** How long a dashboard login lasts. */
   DASHBOARD_SESSION_HOURS: z.coerce.number().int().positive().default(12),
 
+  /**
+   * Whether /demo is served. Off by default: it is a public, unauthenticated
+   * page that sends a real text to whatever number is typed into it, so it
+   * must be switched on deliberately rather than shipped open.
+   */
+  DEMO_FORM_ENABLED: z.enum(["true", "false"]).default("false"),
+
+  /**
+   * Texts the demo form may trigger per hour, across all visitors. The TextBee
+   * free tier allows 50 a month; without a ceiling one afternoon of curious
+   * visitors exhausts it and the real client's leads go untexted.
+   */
+  DEMO_FORM_HOURLY_LIMIT: z.coerce.number().int().positive().default(5),
+
   // --- Per-client values. Everything below differs between deployments. ---
   BUSINESS_NAME: z.string().min(1),
   BUSINESS_COUNTRY_CODE: z

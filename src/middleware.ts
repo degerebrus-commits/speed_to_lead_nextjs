@@ -39,8 +39,10 @@ export const config = {
      * Everything except:
      *   api           - authenticated by shared secret / HMAC, not a session
      *   login         - the door itself
+     *   demo          - public by design; guarded by DEMO_FORM_ENABLED and a
+     *                   rate limit rather than a password
      *   _next, favicon - framework and static assets
      */
-    "/((?!api|login|_next/static|_next/image|favicon.ico).*)",
+    "/((?!api|login|demo|_next/static|_next/image|favicon.ico).*)",
   ],
 };

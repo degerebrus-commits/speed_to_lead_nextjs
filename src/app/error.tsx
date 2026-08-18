@@ -21,8 +21,8 @@ export default function DashboardError({
         <h3>The dashboard could not be loaded.</h3>
         <p>
           Nothing was changed, and no lead data was affected — this screen only
-          reads. The database may be unreachable; check that it is running, then
-          try again.
+          reads. Try again; if it keeps failing, the server log has the actual
+          cause.
         </p>
       </div>
 
