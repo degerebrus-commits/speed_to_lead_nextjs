@@ -13,9 +13,14 @@ export interface LeadListItem {
   smsOptedOutAt: Date | null;
   /** Null means no consent recorded, so nothing may be texted to them. */
   smsConsentAt: Date | null;
-  /** Preview text for the row, taken from the most recent message. */
+  /**
+   * Preview text: the customer's most recent message, falling back to ours
+   * when they have not replied yet.
+   */
   lastMessageBody: string | null;
   lastMessageAt: Date | null;
+  /** False when the preview is our own message, so the row can say so. */
+  lastMessageIsInbound: boolean;
   hasAppointment: boolean;
 }
 
@@ -66,6 +71,22 @@ export interface LeadDetail {
 
 const DEFAULT_PAGE_SIZE = 25;
 
+/**
+ * Picks the row preview: the customer's most recent message, or ours when they
+ * have not replied. Messages arrive newest-first.
+ */
+function previewOf(
+  messages: { body: string; createdAt: Date; direction: MessageDirection }[],
+): Pick<LeadListItem, "lastMessageBody" | "lastMessageAt" | "lastMessageIsInbound"> {
+  const chosen = messages.find((message) => message.direction === "INBOUND") ?? messages[0];
+
+  return {
+    lastMessageBody: chosen?.body ?? null,
+    lastMessageAt: chosen?.createdAt ?? null,
+    lastMessageIsInbound: chosen?.direction === "INBOUND",
+  };
+}
+
 export async function listLeads(options?: {
   status?: LeadStatus;
   page?: number;
@@ -91,13 +112,20 @@ export async function listLeads(options?: {
         introSmsSentAt: true,
         smsOptedOutAt: true,
         smsConsentAt: true,
-        // One message and one appointment per lead, rather than a count query
-        // per row: the list is the most-visited screen and N+1 here would be
-        // felt immediately.
+        // The last few messages, not just one, so the preview can show what the
+        // *customer* said. Previewing the newest message of any kind meant a
+        // qualified lead read as the assistant's own question - which tells an
+        // owner nothing they did not already know.
+        //
+        // Prisma cannot include the same relation twice with different filters,
+        // so a small window is fetched and the choice is made below. Ten is
+        // enough that a customer's reply is in view unless the assistant has
+        // sent ten in a row, and it is still one join rather than a query per
+        // row - the list is the most-visited screen and N+1 would be felt.
         messages: {
           orderBy: { createdAt: "desc" },
-          take: 1,
-          select: { body: true, createdAt: true },
+          take: 10,
+          select: { body: true, createdAt: true, direction: true },
         },
         appointments: {
           where: { status: { in: ["PENDING", "CONFIRMED", "COMPLETED"] } },
@@ -118,8 +146,7 @@ export async function listLeads(options?: {
       introSmsSentAt: row.introSmsSentAt,
       smsOptedOutAt: row.smsOptedOutAt,
       smsConsentAt: row.smsConsentAt,
-      lastMessageBody: row.messages[0]?.body ?? null,
-      lastMessageAt: row.messages[0]?.createdAt ?? null,
+      ...previewOf(row.messages),
       hasAppointment: row.appointments.length > 0,
     })),
     total,
