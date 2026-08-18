@@ -97,12 +97,28 @@ every line past the signature check. Likely moot if the client provides Twilio.
 
 ## Known issues
 
-**One unexplained test failure.** On 2026-08-18 a run reported `1 failed | 179
-passed`; four consecutive runs immediately after were clean, and the failing run
-was not captured, so the test was never identified. If CI goes red
-intermittently, start here. Two earlier failures that looked like flakes turned
-out to be two suites sharing `hvac_leads_test` — check nothing else is running
-against that database before assuming a real fault.
+**The suite fails intermittently on this machine, roughly one run in three.**
+Always a timeout in the metrics specs. Diagnosed 2026-08-18 and it is not a
+code defect: sampling Postgres during a failing run showed zero lock waits,
+zero idle-in-transaction sessions, 11 of 100 connections and 0% container CPU
+- the database is idle while the client times out. The machine has ~1.8 GB of
+6.9 GB free with over a gigabyte paged out, so a vitest fork gets descheduled
+long enough to blow the timeout while doing no work. Windows Defender
+(`MsMpEng`) scanning `node_modules` compounds it.
+
+The metrics specs lose because they are the heaviest - five concurrent queries
+in one `Promise.all` - so they hold the widest window to be interrupted in.
+
+Two changes were made while diagnosing and are kept on their own merits: the
+test timeout is 20s rather than vitest's 5s, and `tests/setup.ts` no longer
+disconnects Prisma after every file (setup files run per file, and the suite
+shares one fork, so it was tearing down the pool two dozen times a run).
+Neither cured it, because neither was the cause.
+
+**Expect CI to be green** - dedicated runner, its own Postgres, no antivirus.
+If CI ever goes red intermittently, that is new information and worth
+chasing. Locally, closing Chrome or excluding this folder from Defender is
+the fix.
 
 **`Firstline-Landing-Package.html` is untracked at the repo root**, newer than
 the copy in the landing repo. It belongs there, not here.
