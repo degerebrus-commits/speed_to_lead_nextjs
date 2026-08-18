@@ -82,13 +82,18 @@ a tree.
 
 **What happened.** I wrote a PowerShell path into `STATUS.md` through a Python
 heredoc. Python printed `SyntaxWarning: invalid escape sequence` and I read past
-it. `` became a vertical tab and `` a carriage return, so the documented
-command was `\Claudem_bundles\claudevm.bundleootfs.vhdx` - unrunnable, in the
-file a new session reads first.
+it. Backslash-v became a vertical tab and backslash-r a carriage return, so the
+documented command came out as `Claudem_bundles ... claudevm.bundleootfs` -
+unrunnable, in the file a new session reads first.
+
+**And then I did it again.** Writing *this entry* through a heredoc ate the same
+two escapes, leaving a sentence that read "`` became a vertical tab". The
+warning fired that time too, and I missed it twice in one day. Rewritten with a
+literal-text editor, which is what the rule below says to do.
 
 **Prevention rule.** A warning from the tool doing the work is evidence, not
-noise. And never build Windows paths in a language that interprets
-backslashes - use a literal-text editor.
+noise. And never build Windows paths in a language that interprets backslashes -
+use a literal-text editor, or the path will be wrong in a way that reads fine.
 
 ---
 
