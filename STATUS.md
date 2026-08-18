@@ -1,62 +1,124 @@
 # Project Status
 
-Snapshot as of **2026-08-17**. Read this with `CONTRIBUTING.md` (conventions and
-the single-tenant decision), `MISTAKES.md` (what went wrong here and the rules
-that prevent it), and `STANDARDS.md` (engineering rules).
+Snapshot as of **2026-08-18**. Read with `CONTRIBUTING.md` (conventions and the
+single-tenant decision), `PRD-TRACEABILITY.md` (every requirement, built or
+not), `SPEC-COMPARISON.md` (how this differs from the Express build),
+`MISTAKES.md` (what went wrong and the rules that prevent it), and
+`STANDARDS.md`.
 
-> **Phase 5 booking is verified.** `114 tests passing across 14 files`, run
-> against a live database on 2026-08-18. The booking suite exercises the real
-> `slotKey` unique-constraint path, not a mocked one.
-ootfs.vhdx" -Force`
+**180 tests passing**, typecheck clean, production build succeeds, CI runs on
+every push.
 
 ---
 
-## Where things stand
+## Where the code lives
+
+| Repo | Contains |
+|---|---|
+| **`speed_to_lead_nextjs`** | This application. `main` is the only branch |
+| `lead-to-speed-landingpage` | Landing page and the live demo form |
+| `speed_to_lead_backend` | A parallel build by luislndch — Express + SQLite, with a 1192-line specification. Not superseded; see `SPEC-COMPARISON.md` |
+
+The landing page was briefly duplicated here under `landing/` and drifted within
+hours. It is gone; `DEMO-FORM-PROMPT.md` documents the `/api/demo/lead` contract
+instead, so the link between the projects is a specification rather than a copy.
+
+---
+
+## Phases
 
 | Phase | State |
 |---|---|
 | 1 — Foundation, lead capture | **Done**, verified end to end |
-| 2 — Lead management UI | **Not started** — the app has no pages at all |
-| 3 — SMS outbound | **Done**, verified with a real text on a real handset |
-| 3 — SMS inbound | **Code done and verified over the public URL.** Real device capture blocked — see Blockers |
-| 3 — Retry queue | **Done** — `POST /api/leads/retry-intro-sms` drains leads that never got a first message |
+| 2 — Lead management UI | **Done** — list, filters, paging, conversation view |
+| 3 — SMS out / in / retry | **Done**, verified with a real text on a real handset |
 | 4 — AI qualification | **Done**, verified live on `claude-haiku-4-5` |
-| 5 — Booking | **Done**, verified — fixed-slot booking, no calendar needed for MVP |
-| 6 — Analytics | **Not started** |
-| 7 — Hardening | **Not started** |
-
-**114 tests passing** across 14 files, typecheck clean, production build succeeds.
+| 5 — Booking | **Done** — fixed slots, no calendar needed for MVP |
+| 6 — Analytics | **Done** — speed to lead, booking rate, after-hours split |
+| 7 — Hardening | **Started** — dashboard auth done; see Outstanding |
 
 ---
 
 ## Verified, not assumed
 
-- A website form POST creates a lead and triggers an intro SMS. Confirmed by reading the row back from Postgres, not from the API response.
-- A real text arrived on the client's Redmi handset via TextBee. Copy matched the configured template byte for byte.
-- The inbound webhook was driven over the public internet: unsigned → 401, signed → 200 and stored, replay → 200 with `duplicate: true` and no second row.
-- A full qualification turn ran through Haiku: customer reply in, one qualifying question out, lead moved `NEW → ENGAGED`, both turns stored.
+- A website form POST creates a lead and triggers an intro SMS, confirmed by reading the row back from Postgres rather than trusting the API response.
+- A real text arrived on the client's Redmi handset via TextBee, copy matching the template byte for byte.
+- The inbound webhook driven over the public internet: unsigned → 401, signed → 200 and stored, replay → `duplicate: true` with no second row.
+- A full qualification turn through Haiku: reply in, question out, lead `NEW → ENGAGED`, both turns stored.
+- Double-booking prevented by the unique constraint on `Appointment.slotKey` — the `P2002` appears in the test output, so the race is genuinely exercised.
+- The dashboard refuses unauthenticated access: `/` and `/leads` redirect, a forged cookie yields a redirect payload containing no customer data, a correctly signed cookie renders.
+- **A fresh clone runs.** Cloned into an empty folder, `npm ci`, `prisma generate`, `migrate deploy`, suite green with a `.env` containing only a database URL and dummy keys.
 
 ---
 
-## Blockers
+## Blockers, none of them code
 
-**The TextBee app on the Redmi does not capture incoming SMS.** Everything downstream is proven working — webhook URL, signature, storage, AI reply. The gap is the handset: `receivedSMSCount` never increments even for a text from a different number, while `sentSMSCount` does. Look at the app's SMS permissions and MIUI battery/autostart restrictions. This is a device problem, not a code problem — development is not blocked by it, because a signed POST is indistinguishable from a real delivery to every line of code past the signature check.
+**A2P 10DLC registration has not started.** Until it is approved the system can
+only text our own handset, not real customers. One to two weeks, and it will
+not pass without the consent line live on the client's form. This is the
+critical path to going live — see `CLIENT-REQUIREMENTS.md`, which is written
+for the client to read directly.
 
-**The OpenAI account has no credit** (`insufficient_quota`). The key is valid. `AI_PROVIDER=openai` will fail until billing is added; `anthropic` works.
+**The TextBee app on the Redmi does not capture incoming SMS.** Everything
+downstream is proven; `receivedSMSCount` never increments. A device problem,
+not a code problem — a signed POST is indistinguishable from a real delivery to
+every line past the signature check. Likely moot if the client provides Twilio.
+
+**The OpenAI account has no credit.** `AI_PROVIDER=openai` fails with
+`insufficient_quota`; `anthropic` works.
 
 ---
 
-## Outstanding work, in priority order
+## Outstanding, in priority order
 
-1. **Phases 2 + 6 together.** The lead list, conversation view, and metrics are one screen's worth of work, and the app still has no pages at all. Doing 6 alone would ship a dashboard whose booking-rate and appointment-volume metrics now have real data behind them — but nothing to display it on.
-2. **Phases 2 + 6 together.** The lead list, conversation view, and metrics are one screen's worth of work. Doing 6 first would ship a dashboard whose booking-rate, appointment-volume, and completion-rate metrics are structurally zero.
-3. **Amend `STANDARDS.md` §13/§14/§15/§57.3.** They mandate multi-tenancy and OWNER/ADMIN/STAFF roles, which this build deliberately does not have. Left untouched pending permission; until amended the contradiction resurfaces every session.
+1. **`scheduledAt` on `Appointment`.** Today an appointment stores a slot *label*
+   ("Thu 2pm-4pm"), so nobody can answer "what is on tomorrow?". Roughly an hour,
+   and Google Calendar needs real timestamps regardless.
+2. **Cancel and reschedule.** Both are PRD requirements and neither exists. No
+   code path anywhere sets `AppointmentStatus.CANCELLED`, so a slot booked by
+   mistake cannot be released without hand-editing SQL.
+3. **Remaining security findings.** The rate-limiter key is taken from an
+   unvalidated `X-Forwarded-For` and is unbounded, so it can be both bypassed
+   and used to grow memory pre-auth. `POST /api/leads/retry-intro-sms` has no
+   rate limit at all. The logger redacts key *names* at depth 1 only, while every
+   route logs `error.message` unscrubbed.
+4. **A Dockerfile and deployment config.** None exists, and Railway is the
+   documented target. `SPEC-COMPARISON.md` notes the Express build has this
+   already and it is worth following.
+5. **Structured qualification.** Urgency, property type and preferred time are
+   discussed with the customer and then left in message text, unqueryable. The
+   other build's `record_qualification` tool idea closes this — the model
+   extracts, the code still executes.
+6. **`STANDARDS.md` §13/§14/§15/§57.3.** They mandate multi-tenancy and
+   OWNER/ADMIN/STAFF roles, which this build deliberately does not have. Still
+   untouched pending permission; the contradiction resurfaces every session.
+
+---
+
+## Known issues
+
+**One unexplained test failure.** On 2026-08-18 a run reported `1 failed | 179
+passed`; four consecutive runs immediately after were clean, and the failing run
+was not captured, so the test was never identified. If CI goes red
+intermittently, start here. Two earlier failures that looked like flakes turned
+out to be two suites sharing `hvac_leads_test` — check nothing else is running
+against that database before assuming a real fault.
+
+**`Firstline-Landing-Package.html` is untracked at the repo root**, newer than
+the copy in the landing repo. It belongs there, not here.
+
+**An unknown lead id returns HTTP 200** rather than 404, while correctly
+rendering the "Lead not found" page. Removing the loading boundary did not
+change it, so the streamed-status theory is wrong and the cause is unidentified.
+Cosmetic — no data leaks.
 
 ---
 
 ## Environment gotchas that will waste your time
 
-**The folder name contains `&`.** cmd.exe treats it as a command separator, so every npm/npx `.cmd` shim resolves a truncated path and fails with an error naming a directory that does not exist. Call the JS entrypoints through node instead:
+**The folder name contains `&`.** cmd.exe treats it as a command separator, so
+every npm/npx `.cmd` shim resolves a truncated path. Call the JS entrypoints
+through node instead:
 
 ```powershell
 node node_modules/next/dist/bin/next dev -p 3100
@@ -70,13 +132,20 @@ node node_modules/vitest/vitest.mjs run
 node node_modules/prisma/build/index.js migrate dev
 ```
 
-Renaming the folder to drop the `&` fixes this permanently.
+A fresh clone into a folder without the `&` does not have this problem — `npm ci`
+and `npm test` work normally there. Renaming this folder fixes it permanently.
 
-**Postgres runs on port 5442**, not 5432 — another project on this machine already binds 5432. `POSTGRES_PORT` and the port inside `DATABASE_URL` must agree.
+**Postgres runs on port 5442**, not 5432 — another project already binds 5432.
+`POSTGRES_PORT` and the port inside `DATABASE_URL` must agree.
 
 **Windows PowerShell 5.1 has no `&&`.** Chain with `;`.
 
-**Restart the dev server after any `.env` edit.** Next reads `.env` once at boot, and `getEnv()` caches the parsed result for the process lifetime. Hot reload does not pick up either.
+**Restart the dev server after any `.env` edit.** Next reads `.env` once at boot
+and `getEnv()` caches it for the process lifetime.
+
+**Never run `next build` while the dev server is running.** The production build
+overwrites `.next` underneath it and every route starts returning 500. Stop the
+server, delete `.next`, restart.
 
 ---
 
@@ -90,16 +159,19 @@ docker compose up -d db
 docker compose exec db pg_isready -U postgres
 ```
 
-`docker compose up -d` exits 0 as soon as the container is *created*, which is before Postgres accepts connections — gate on `pg_isready`, not the exit code.
+`docker compose up -d` exits 0 as soon as the container is *created*, which is
+before Postgres accepts connections — gate on `pg_isready`, not the exit code.
 
 ```powershell
 node node_modules/next/dist/bin/next dev -p 3100
 ```
 
+The dashboard is at `/` and requires `DASHBOARD_PASSWORD` from `.env`. Unset
+means it serves nothing at all rather than serving openly.
+
 ### Inbound webhook over the internet
 
-Tailscale Funnel is currently **off**. The URL is stable across restarts, so the
-TextBee webhook registration does not need re-pointing when you turn it back on:
+Tailscale Funnel is currently **off**. The URL is stable across restarts:
 
 ```powershell
 & "C:\Program Files\Tailscale\tailscale.exe" funnel --bg 3100
@@ -107,8 +179,7 @@ TextBee webhook registration does not need re-pointing when you turn it back on:
 
 Endpoint: `https://desktop-vlqd8rl-1.tail586fe5.ts.net/api/webhooks/sms`
 
-Turn it off when you stop testing — it exposes the whole dev server, not just
-the webhook path:
+Turn it off when you stop testing — it exposes the whole dev server:
 
 ```powershell
 & "C:\Program Files\Tailscale\tailscale.exe" funnel --https=443 off
@@ -120,24 +191,25 @@ the webhook path:
 
 | Setting | Value |
 |---|---|
-| `AI_PROVIDER` | `anthropic` → `claude-haiku-4-5` (blank `AI_MODEL` means provider default) |
+| `AI_PROVIDER` | `anthropic` → `claude-haiku-4-5` |
 | `SMS_PROVIDER` | `console` — logs instead of sending, costs nothing |
 | Business hours | 08:00–18:00, Mon–Sat, `America/Chicago` |
 | Real texts spent | **1 of 50** on the TextBee free tier |
-
-Switching AI providers is one variable: `AI_PROVIDER=openai` uses `gpt-4o-mini`,
-`anthropic` uses Haiku. Neither needs a model string.
+| `DEMO_FORM_ENABLED` | `true` locally — **turn off before deploying** |
 
 **Tests never reach a paid API.** `getSmsProvider()` and `getAiProvider()` both
-throw outright when `NODE_ENV=test`, and `tests/setup.ts` installs stub
-providers by default. Running the suite is free.
+throw when `NODE_ENV=test`, and `tests/setup.ts` installs stubs. Running the
+suite is free.
 
 ---
 
 ## Design decisions worth not re-litigating
 
-- **Single-tenant.** One deployment per business; no `Organization`, no `organizationId`, no roles. Per-client customization is `.env` only. See `CONTRIBUTING.md`.
-- **Nothing customer-facing is hardcoded.** Business name, rep name, service area, hours, and every message template are configuration. `renderTemplate()` substitutes `{placeholder}` tokens and leaves unknown ones visible so a typo is obvious rather than silent.
-- **Idempotency is a database constraint, not a `SELECT`.** `Lead.dedupeKey` and `Message.providerMessageId` are unique; the `P2002` violation is caught. Do not replace either with a find-then-create — two simultaneous deliveries would both read nothing and both insert.
+- **Single-tenant.** One deployment per business; no `Organization`, no roles. Per-client customization is `.env` only.
+- **Not a monorepo.** One Next.js application serving both pages and API routes from a single process, so pages import server functions directly and the types stay honest end to end.
+- **Nothing customer-facing is hardcoded.** `renderTemplate()` leaves unknown placeholders visible so a typo is obvious rather than silent.
+- **Idempotency is a database constraint, not a `SELECT`.** `Lead.dedupeKey` and `Message.providerMessageId` are unique and the `P2002` is caught. Do not replace either with find-then-create.
 - **Emergency detection runs in code, before the model.** A safety path that depends on a third-party API being healthy is not a safety path.
-- **Failure isolation.** A lead is stored even when the SMS or AI call fails; the webhook still returns 2xx so the gateway stops retrying something already stored.
+- **Consent gates sending, not storing.** A lead without a consent tick is saved and flagged on the dashboard; the text is held. Losing a customer over a missing checkbox would be worse than not texting them.
+- **A digit only counts as a slot choice after slots were offered.** Reading every number as a selection booked appointments for customers describing their problem.
+- **Failure isolation.** A lead is stored even when the SMS or AI call fails, and the webhook still returns 2xx so the gateway stops retrying something already stored.
