@@ -83,10 +83,28 @@ every line past the signature check. Likely moot if the client provides Twilio.
    OWNER/ADMIN/STAFF roles, which this build deliberately does not have. Still
    untouched pending permission; the contradiction resurfaces every session.
 
-**Deployment is ready but has never been deployed.** `DEPLOYMENT.md`, a
-multi-stage Dockerfile on Next's standalone output, an entrypoint that applies
-migrations before serving, and `GET /api/health` which queries the database and
-returns 503 when it cannot. The image builds; nothing has run on Railway yet.
+**Deployment: the image builds and starts, but was not proven stable locally.**
+`DEPLOYMENT.md`, a three-stage Dockerfile on Next's standalone output, an
+entrypoint applying migrations before serving, and `GET /api/health`.
+
+What was verified on 2026-08-18: the image builds (954 MB), the container
+starts, `migrate deploy` runs, the server is ready in ~2s, `/login` returns 200
+and `POST /api/leads/webhook` correctly returns 401 without a secret. Prisma
+queries succeed when run by hand inside the container, and the query engine and
+health route are both present in the image.
+
+**Then it wedges.** Within a few minutes every route returns nothing - no
+response, no log line, and `docker exec` into the container hangs as well. The
+container still reports `Up`, using 64 MB and 0% CPU. Not diagnosed.
+
+Docker Desktop's VM has **941 MB total** for all containers, on a host with
+~1.8 GB free and a gigabyte paged out, and it is already running two Postgres
+containers. That is the obvious suspect and matches every other resource
+problem on this machine today, but it is a suspicion, not a finding.
+
+**Do not treat the container as working until it has been run somewhere with
+real memory.** Railway is the natural place to find out - and if it wedges
+there too, this is a genuine defect rather than the machine.
 
 ### Done since this file was last written
 
