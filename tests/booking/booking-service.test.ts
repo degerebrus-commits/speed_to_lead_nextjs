@@ -54,26 +54,45 @@ describe("hasBookingIntent", () => {
 });
 
 describe("matchSlotChoice", () => {
-  it("accepts a bare number", () => {
-    expect(matchSlotChoice("2", SLOTS)).toBe("Mon-Fri 11am");
+  it("accepts a bare number once slots have been offered", () => {
+    expect(matchSlotChoice("2", SLOTS, true)).toBe("Mon-Fri 11am");
   });
 
   it("accepts a number inside a sentence", () => {
-    expect(matchSlotChoice("3 please", SLOTS)).toBe("Mon-Fri 2pm");
+    expect(matchSlotChoice("3 please", SLOTS, true)).toBe("Mon-Fri 2pm");
   });
 
   it("accepts the label itself", () => {
-    expect(matchSlotChoice("Sat 10am works", SLOTS)).toBe("Sat 10am");
+    expect(matchSlotChoice("Sat 10am works", SLOTS, true)).toBe("Sat 10am");
   });
 
   it("returns null for a number outside the offered range", () => {
     // Booking slot 9 when four were offered would book the wrong time.
-    expect(matchSlotChoice("9", SLOTS)).toBeNull();
+    expect(matchSlotChoice("9", SLOTS, true)).toBeNull();
   });
 
   it("returns null rather than guessing on an ambiguous reply", () => {
-    expect(matchSlotChoice("either of those is fine", SLOTS)).toBeNull();
-    expect(matchSlotChoice("", SLOTS)).toBeNull();
+    expect(matchSlotChoice("either of those is fine", SLOTS, true)).toBeNull();
+    expect(matchSlotChoice("", SLOTS, true)).toBeNull();
+  });
+
+  it("ignores a number when no slots were offered", () => {
+    // The bug this guards: every inbound message was matched, so an ordinary
+    // description of the problem booked an appointment and told the customer
+    // they were confirmed.
+    for (const message of [
+      "It's been broken for 3 days",
+      "I have 2 units",
+      "6 year old system",
+      "there are 3 bedrooms upstairs",
+    ]) {
+      expect(matchSlotChoice(message, SLOTS, false), message).toBeNull();
+    }
+  });
+
+  it("still accepts an explicit label when no slots were offered", () => {
+    // A label cannot be typed by accident, so it carries its own intent.
+    expect(matchSlotChoice("can you do Sat 10am", SLOTS, false)).toBe("Sat 10am");
   });
 });
 

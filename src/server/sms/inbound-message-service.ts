@@ -27,11 +27,18 @@ export type InboundMessagePayload = z.infer<typeof inboundMessageSchema>;
  * Keywords that opt a customer out. Consumer SMS regulations require honouring
  * these, and TextBee - unlike Twilio - does not intercept them at the carrier,
  * so the application must.
+ *
+ * Deliberately only the unambiguous ones. "cancel" was here and meant that
+ * "cancel my appointment" silently opted the customer out of all texts, sent
+ * no reply, and left the appointment confirmed with its slot still consumed -
+ * the business could no longer contact them and did not know the visit was
+ * unwanted. "yes" was in the opt-in set, which suppressed the reply to any
+ * message starting with it and re-subscribed someone who had sent STOP.
  */
-const OPT_OUT_KEYWORDS = new Set(["stop", "stopall", "unsubscribe", "cancel", "end", "quit"]);
+const OPT_OUT_KEYWORDS = new Set(["stop", "stopall", "unsubscribe", "end", "quit"]);
 
 /** Keywords that opt a customer back in. */
-const OPT_IN_KEYWORDS = new Set(["start", "unstop", "yes"]);
+const OPT_IN_KEYWORDS = new Set(["start", "unstop"]);
 
 /**
  * Compares only the first word, case-insensitively, ignoring punctuation.
@@ -101,14 +108,21 @@ export async function handleInboundMessage(
       },
     });
 
-    if (lead && keyword) {
-      await prisma.lead.update({
-        where: { id: lead.id },
+    if (keyword) {
+      // Applied to the number, not to one lead row. Lead.phone is indexed but
+      // not unique - a customer who submitted the form twice has several rows -
+      // and consent belongs to the person, not to whichever row happens to be
+      // newest. Updating only that row left the older ones with a null
+      // smsOptedOutAt, which the intro-SMS retry queue then treats as fair
+      // game and texts a number that sent STOP.
+      const affected = await prisma.lead.updateMany({
+        where: { phone },
         data: { smsOptedOutAt: keyword === "opt-out" ? new Date() : null },
       });
 
-      logger.info(`Lead ${keyword === "opt-out" ? "opted out of" : "opted back into"} SMS`, {
-        leadId: lead.id,
+      logger.info(`Number ${keyword === "opt-out" ? "opted out of" : "opted back into"} SMS`, {
+        leadId: lead?.id ?? null,
+        leadsUpdated: affected.count,
       });
     }
 

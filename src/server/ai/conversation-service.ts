@@ -99,7 +99,20 @@ export async function handleCustomerReply(
   const offeredSlots = await getAvailableSlots();
 
   if (offeredSlots.length > 0) {
-    const chosen = matchSlotChoice(inboundBody, offeredSlots);
+    // APPOINTMENT_PENDING is set only by the offer branch below, so it is the
+    // record of having shown this customer a numbered list. A digit counts as
+    // a choice only after that; a slot label still counts at any time.
+    //
+    // Read from the database rather than the passed-in lead: the offer may have
+    // been made on an earlier turn, leaving the caller's copy stale. Trusting
+    // that copy would silently re-open the bug this guard exists to close.
+    const current = await prisma.lead.findUnique({
+      where: { id: lead.id },
+      select: { status: true },
+    });
+
+    const wasOfferedSlots = current?.status === "APPOINTMENT_PENDING";
+    const chosen = matchSlotChoice(inboundBody, offeredSlots, wasOfferedSlots);
 
     if (chosen) {
       const booking = await bookSlot(lead, chosen);

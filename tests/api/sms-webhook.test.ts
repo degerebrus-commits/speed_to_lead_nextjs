@@ -181,6 +181,73 @@ describe("POST /api/webhooks/sms", () => {
       expect(updated.smsOptedOutAt).not.toBeNull();
     });
 
+    it("applies the opt-out to every lead sharing that number", async () => {
+      // Lead.phone is not unique: a customer who submitted the form twice has
+      // several rows. Marking only the newest left the older ones eligible for
+      // the intro-SMS retry queue, which then texted a number that sent STOP.
+      const base = {
+        name: "John Carter",
+        phone: CUSTOMER_PHONE,
+        serviceAddress: "42 Oak Street",
+        initialMessage: "My AC is not cooling.",
+      };
+
+      const older = await prisma.lead.create({
+        data: { ...base, dedupeKey: "older-submission", introSmsSentAt: null },
+      });
+      const newer = await prisma.lead.create({
+        data: { ...base, dedupeKey: "newer-submission" },
+      });
+
+      await POST(
+        buildRequest(buildPayload({ data: { _id: "stop-multi", message: "STOP" } })),
+      );
+
+      for (const lead of [older, newer]) {
+        const updated = await prisma.lead.findUniqueOrThrow({ where: { id: lead.id } });
+        expect(updated.smsOptedOutAt, lead.dedupeKey).not.toBeNull();
+      }
+    });
+
+    it("treats 'cancel my appointment' as a message, not an opt-out", async () => {
+      // "cancel" used to be an opt-out keyword, so this silently unsubscribed
+      // the customer, sent no reply, and left the appointment confirmed with
+      // its slot still consumed.
+      const lead = await seedLead();
+
+      const response = await POST(
+        buildRequest(
+          buildPayload({ data: { _id: "cancel-1", message: "Cancel my appointment please" } }),
+        ),
+      );
+
+      expect(response.status).toBe(200);
+      expect((await response.json()).keyword).toBeNull();
+
+      const updated = await prisma.lead.findUniqueOrThrow({ where: { id: lead.id } });
+      expect(updated.smsOptedOutAt).toBeNull();
+    });
+
+    it("does not treat 'yes' as an opt-in that resubscribes a stopped number", async () => {
+      const lead = await prisma.lead.create({
+        data: {
+          name: "John Carter",
+          phone: CUSTOMER_PHONE,
+          serviceAddress: "42 Oak Street",
+          initialMessage: "My AC is not cooling.",
+          dedupeKey: "already-opted-out",
+          smsOptedOutAt: new Date(),
+        },
+      });
+
+      await POST(
+        buildRequest(buildPayload({ data: { _id: "yes-1", message: "Yes that works" } })),
+      );
+
+      const updated = await prisma.lead.findUniqueOrThrow({ where: { id: lead.id } });
+      expect(updated.smsOptedOutAt).not.toBeNull();
+    });
+
     it("does not opt out on an ordinary sentence containing the word", async () => {
       const lead = await seedLead();
 

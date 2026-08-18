@@ -184,6 +184,51 @@ describe("handleCustomerReply", () => {
       expect(updated.status).toBe("APPOINTMENT_PENDING");
     });
 
+    it("does not book when a number appears in an ordinary description", async () => {
+      // The regression this exists for: slot matching ran on every inbound
+      // message, so any 1-2 digit number was read as a slot choice. A customer
+      // answering "what's wrong?" got a confirmed appointment they never asked
+      // for, and the slot was consumed with no code path able to release it.
+      const ai = installAi("Sorry to hear that - how long has it been like that?");
+      const lead = await seedLead();
+
+      const outcome = await handleCustomerReply(lead, "It's been broken for 3 days");
+
+      expect(outcome.kind).not.toBe("booked");
+      expect(await prisma.appointment.count({ where: { leadId: lead.id } })).toBe(0);
+      expect(ai.calls).toBe(1);
+
+      const updated = await prisma.lead.findUniqueOrThrow({ where: { id: lead.id } });
+      expect(updated.status).not.toBe("BOOKED");
+    });
+
+    it("does not book on a number until slots have actually been offered", async () => {
+      const ai = installAi("Thanks - what seems to be the trouble?");
+      const lead = await seedLead();
+
+      await handleCustomerReply(lead, "I have 2 units in the house");
+      expect(await prisma.appointment.count({ where: { leadId: lead.id } })).toBe(0);
+
+      // ...and once offered, the same reply shape does book.
+      await handleCustomerReply(lead, "Can I book someone in?");
+      const outcome = await handleCustomerReply(lead, "2");
+
+      expect(outcome.kind).toBe("booked");
+      expect(ai.calls).toBe(1);
+    });
+
+    it("books an explicit slot label even before any offer", async () => {
+      // A label cannot be typed by accident, so it carries its own intent and
+      // must not be caught by the guard above.
+      installAi("should not be used");
+      const lead = await seedLead();
+
+      const outcome = await handleCustomerReply(lead, "can you do Sat 10am");
+
+      expect(outcome.kind).toBe("booked");
+      expect(outcome.reply).toContain("Sat 10am");
+    });
+
     it("books the chosen slot and confirms it", async () => {
       const ai = installAi("should not be used");
       const lead = await seedLead();

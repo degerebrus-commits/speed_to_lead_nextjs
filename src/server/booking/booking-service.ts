@@ -54,15 +54,27 @@ export function hasBookingIntent(messageBody: string): boolean {
  * label itself ("Mon-Fri 11am") - customers do all three. Returns null rather
  * than guessing when the reply is ambiguous, because a wrong guess books the
  * wrong time.
+ *
+ * `allowNumericChoice` must be false unless this customer was just shown a
+ * numbered list. A bare digit is only a choice in reply to one: read
+ * unconditionally it turns "it's been broken for 3 days" into a confirmed
+ * appointment. A label match carries its own context and is always safe -
+ * nobody types "Mon-Fri 11am" by accident.
  */
-export function matchSlotChoice(messageBody: string, offeredSlots: string[]): string | null {
+export function matchSlotChoice(
+  messageBody: string,
+  offeredSlots: string[],
+  allowNumericChoice: boolean,
+): string | null {
   const haystack = normalize(messageBody);
   if (haystack.length === 0 || offeredSlots.length === 0) return null;
 
-  const numeric = haystack.match(/\b([1-9]\d?)\b/);
-  if (numeric) {
-    const index = Number.parseInt(numeric[1], 10) - 1;
-    if (index >= 0 && index < offeredSlots.length) return offeredSlots[index];
+  if (allowNumericChoice) {
+    const numeric = haystack.match(/\b([1-9]\d?)\b/);
+    if (numeric) {
+      const index = Number.parseInt(numeric[1], 10) - 1;
+      if (index >= 0 && index < offeredSlots.length) return offeredSlots[index];
+    }
   }
 
   const labelMatches = offeredSlots.filter((slot) => haystack.includes(normalize(slot)));
