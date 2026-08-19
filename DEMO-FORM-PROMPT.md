@@ -71,6 +71,19 @@ buried in fine print:
 - The **submit button stays disabled** until it has been pressed, with helper
   text explaining why: "Agree to messaging to continue"
 - Pressing it again undoes it
+
+**Known bugs in the current build, fix these specifically:**
+
+- **It takes two clicks to register.** The first press does nothing visible and
+  leaves submit disabled. One click must toggle it, every time.
+- **The state change is invisible.** Pressing it produced no change in label,
+  background, border or text colour - so there is no way to tell whether
+  consent has been given. It caught the same person out three times in two
+  days. Make the agreed state unmistakable: filled background, a check mark,
+  and a label that changes.
+- **A failed submit leaves its error on screen indefinitely.** "Could not reach
+  the assistant" stayed visible long after the failure, so a stale message
+  read as a fresh one. Clear the status the moment anyone touches the form.
 - The disclosure paragraph sits directly above or beside it and is fully
   readable — not collapsed, not behind a "read more", not in 9px grey
 
