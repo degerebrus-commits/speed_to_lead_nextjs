@@ -75,6 +75,28 @@ dashboard updated.
 registered for A2P 10DLC, and US carriers filter unregistered automated
 business traffic. TextBee and SMS Gate were only ever development tools.
 
+**A likely cause of the outbound delay, found 2026-08-19 and not yet tested.**
+The TextBee device record reads `heartbeatIntervalMinutes: 30`, and observed
+delays have been 23-35 minutes. TextBee pushes a send request to the handset
+over FCM; if the push does not wake the app, the message waits until the app
+next wakes on its own - up to the heartbeat. The handset is a Redmi running
+MIUI, whose battery manager suppresses background wakeups aggressively.
+
+That matches the whole distribution, and it explains the asymmetry: inbound is
+instant because the phone is already awake when it receives a text.
+
+Worth ten minutes before writing TextBee off: set the app to *No restrictions*,
+enable Autostart, lock it in Recents, and drop the heartbeat interval. If a
+message then lands in seconds, the gateway is demo-viable - though still never
+launch-viable, for the A2P reason above.
+
+**Another application is sending through the same TextBee account.** A
+confirmation nobody here wrote ("Ok you are booked Aug 20, 22026 2PM") appears
+in TextBee's Sent log and in no row of our database. There is exactly one
+webhook subscription and it is ours, so the other app receives nothing - but
+sending needs only the API key. Any SMS test is polluted until that is
+resolved. Rotate `TEXTBEE_API_KEY` to cut it off.
+
 **The Twilio provider is built and tested** - outbound through the REST API, and
 an inbound webhook verified against X-Twilio-Signature, which signs the request
 URL as well as the parameters. It needs an account: TWILIO_ACCOUNT_SID,
@@ -127,6 +149,40 @@ real memory.** Railway is the natural place to find out - and if it wedges
 there too, this is a genuine defect rather than the machine.
 
 ### Done on 2026-08-19
+
+- **Google Calendar, connected and proven.** A service-account JWT minted with
+  node:crypto rather than the googleapis SDK - thirty lines against tens of
+  megabytes for two endpoints. Confirmed appointments are written to the
+  business's calendar, and the calendar is read back to filter availability, so
+  "open" now means the business is genuinely free rather than merely not booked
+  by us. Every calendar failure is swallowed and logged: the appointment is
+  already committed and the customer already told, so a Google outage must not
+  turn a successful booking into a failed one. `calendarEventId` stays null on
+  failure and is the backfill queue.
+
+  Verified end to end at 08:32Z: lead intake, three options offered, "1"
+  booked, event on the calendar at the right instant in Asia/Manila with the
+  address in `location` and the customer's own words in the description.
+
+- **Three options at a time, and a second set on request.** The agent offers
+  `SLOT_OFFER_COUNT` (default 3) dated options, soonest first. A customer who
+  replies "none of those work" gets a genuinely different three; when the
+  three-week horizon is exhausted, it hands off to a person rather than
+  apologising in a loop. Matches the 3-5 range the published guidance
+  recommends, and the "offer times near what they wanted" pattern.
+
+  Two columns had to be persisted for this to be safe. `offeredSlotKeys` is the
+  numbered list as shown - recomputing availability when "2" arrives yields a
+  different list if anything was booked in between, and every number below the
+  change shifts, booking the customer into a time they did not pick.
+  `declinedSlotKeys` is what they have turned down, so a later set is actually
+  different.
+
+  Slots are now dated ("Thu Aug 20, 9am") because one configured label resolves
+  to many real occurrences, and a second set is meaningless without the date.
+  `bookSlot` takes the chosen occurrence rather than the label: it used to
+  re-resolve to the *next* occurrence, which would have booked someone who
+  turned down everything sooner into this week regardless.
 
 - **Twilio provider and signed inbound webhook.** The only gateway that can
   carry a real deployment. Needs an account before it can be tested.

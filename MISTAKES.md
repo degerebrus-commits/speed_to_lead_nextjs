@@ -392,3 +392,28 @@ calendar's contents change.
 asserted, not arranged and assumed. Write the test that proves the tests cannot
 reach it. And when a failure looks like domain logic, print the actual state
 before theorising about the algorithm — measurement first, hypothesis second.
+
+---
+
+## Leaked a secret again, by redacting one field and dumping the rest
+
+**What happened.** Querying the TextBee API to count webhook subscriptions, I
+carefully redacted the API key in the output - then printed the raw JSON
+response, which contained `signingSecret` in full. That is
+`TEXTBEE_WEBHOOK_SECRET`, the HMAC key authenticating every inbound webhook.
+It is now in the session transcript and has to be rotated.
+
+**Root cause.** I redacted the input and not the output. The API key was
+something I read from `.env` and knew to hide; the signing secret arrived from
+the network inside a blob I echoed without reading first. Redaction was applied
+to the field I was thinking about rather than to the channel.
+
+**The correct fix.** Told the user immediately, before reporting any findings,
+and gave the rotation steps. The finding the call was made for - one webhook,
+not two - was worth having, but it does not offset this.
+
+**Prevention rule.** Never print a raw third-party API response. Select the
+fields to display by name and print only those. Anything arriving from a
+network call is assumed to carry credentials until each field has been looked
+at - and this is the fourth secret leaked in this project, every one of them a
+value I had not personally typed.
