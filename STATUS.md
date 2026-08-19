@@ -75,6 +75,19 @@ dashboard updated.
 registered for A2P 10DLC, and US carriers filter unregistered automated
 business traffic. TextBee and SMS Gate were only ever development tools.
 
+**Measured 2026-08-19: 24 minutes from dispatch to arrival.** The fourth
+message with the same signature, against a 30-minute device heartbeat. Not
+variance - a mechanism.
+
+The application hands off to TextBee in about two seconds and gets a valid
+provider id back. Everything after that is a handset deciding when to wake.
+No code change reaches it.
+
+This is what settles the gateway question. The product is sold on replying to a
+lead in seconds; a prospect watching a 24-minute wait for the first reply is
+watching the pitch fail. TextBee cannot carry a demo, and for the A2P reason
+below it could never have carried a launch. Twilio is the path.
+
 **A likely cause of the outbound delay, found 2026-08-19 and not yet tested.**
 The TextBee device record reads `heartbeatIntervalMinutes: 30`, and observed
 delays have been 23-35 minutes. TextBee pushes a send request to the handset
