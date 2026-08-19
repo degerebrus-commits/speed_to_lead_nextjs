@@ -166,7 +166,7 @@ export async function POST(
     // Same ordering as the TextBee receiver: HELP is answered from a template
     // regardless of opt-out, and only a genuinely new message from a known lead
     // reaches the conversation.
-    if (result.isNew && result.leadId && result.keyword === "help") {
+    if (result.isNew && !result.isEcho && result.leadId && result.keyword === "help") {
       const lead = await prisma.lead.findUnique({ where: { id: result.leadId } });
       if (lead) {
         try {
@@ -182,7 +182,10 @@ export async function POST(
       }
     }
 
-    if (result.isNew && result.leadId && result.keyword === null) {
+    // !isEcho closes the loop: a handset registered as the gateway can report
+    // our own outbound texts as inbound, and replying to one makes the
+    // assistant answer itself until the quota runs out.
+    if (result.isNew && !result.isEcho && result.leadId && result.keyword === null) {
       const lead = await prisma.lead.findUnique({ where: { id: result.leadId } });
       if (lead) {
         try {

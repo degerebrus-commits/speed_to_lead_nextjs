@@ -15,6 +15,18 @@ export const DEFAULT_SMS_INTRO_TEMPLATE =
  * if anything is missing. A misconfigured deployment should refuse to start
  * rather than accept leads it cannot store or text.
  */
+/**
+ * Treats an empty string as "not set".
+ *
+ * .env.example ships optional keys as `KEY=""` so their existence is visible,
+ * and dotenv hands those through as empty strings rather than undefined - so
+ * `.url()` and `.min(1)` reject them exactly as a wrong value would, and a
+ * deployment that copied the example verbatim could not start. Same shape of
+ * bug as SERVICE_AREA carrying `.min(1)` alongside an empty default.
+ */
+const optional = <T extends z.ZodTypeAny>(schema: T) =>
+  z.preprocess((value) => (value === "" ? undefined : value), schema.optional());
+
 const baseSchema = z.object({
   DATABASE_URL: z.string().url(),
 
@@ -46,17 +58,16 @@ const baseSchema = z.object({
    * refuses to serve at all rather than serving openly: failing closed is the
    * only safe default for a screen holding this data.
    */
-  DASHBOARD_PASSWORD: z
-    .string()
-    .min(12, "must be at least 12 characters - generate with: openssl rand -hex 16")
-    .optional(),
+  DASHBOARD_PASSWORD: optional(
+    z.string().min(12, "must be at least 12 characters - generate with: openssl rand -hex 16"),
+  ),
 
   /**
    * Signing key for the session cookie. Defaults to the dashboard password so
    * a deployment needs one secret rather than two; set it separately to rotate
    * sessions without changing the password people type.
    */
-  DASHBOARD_SESSION_SECRET: z.string().min(16).optional(),
+  DASHBOARD_SESSION_SECRET: optional(z.string().min(16)),
 
   /** How long a dashboard login lasts. */
   DASHBOARD_SESSION_HOURS: z.coerce.number().int().positive().default(12),
@@ -100,9 +111,9 @@ const baseSchema = z.object({
    * server, https://api.sms-gate.app/3rdparty/v1 for the cloud one, or your
    * own host for a private server.
    */
-  SMS_GATE_URL: z.string().url().optional(),
-  SMS_GATE_USERNAME: z.string().min(1).optional(),
-  SMS_GATE_PASSWORD: z.string().min(1).optional(),
+  SMS_GATE_URL: optional(z.string().url()),
+  SMS_GATE_USERNAME: optional(z.string().min(1)),
+  SMS_GATE_PASSWORD: optional(z.string().min(1)),
 
   /**
    * Guards the SMS Gate inbound webhook, which is NOT signed.
@@ -117,11 +128,11 @@ const baseSchema = z.object({
    * but the URL is only ever configured into the gateway and never appears in
    * a browser.
    */
-  SMS_GATE_WEBHOOK_SECRET: z.string().min(24).optional(),
+  SMS_GATE_WEBHOOK_SECRET: optional(z.string().min(24)),
 
   // Required only when SMS_PROVIDER=textbee - see the refinement below.
-  TEXTBEE_API_KEY: z.string().min(1).optional(),
-  TEXTBEE_DEVICE_ID: z.string().min(1).optional(),
+  TEXTBEE_API_KEY: optional(z.string().min(1)),
+  TEXTBEE_DEVICE_ID: optional(z.string().min(1)),
 
   // --- Client identity, continued -----------------------------------------
   /** Name the AI signs messages with. */
@@ -149,7 +160,7 @@ const baseSchema = z.object({
    */
   SERVICE_AREA: z.string().default(""),
   /** Alerted when a conversation is escalated. */
-  OWNER_PHONE: z.string().regex(/^\+[1-9]\d{7,14}$/, "must be E.164").optional(),
+  OWNER_PHONE: optional(z.string().regex(/^\+[1-9]\d{7,14}$/, "must be E.164")),
 
   // --- Message copy --------------------------------------------------------
   SMS_AFTER_HOURS_TEMPLATE: z.string().min(1).default(
@@ -243,15 +254,15 @@ const baseSchema = z.object({
     .optional()
     // A blank value in .env must mean "unset", not a model literally named "".
     .transform((value) => (value && value.trim().length > 0 ? value.trim() : undefined)),
-  OPENAI_API_KEY: z.string().min(1).optional(),
-  ANTHROPIC_API_KEY: z.string().min(1).optional(),
+  OPENAI_API_KEY: optional(z.string().min(1)),
+  ANTHROPIC_API_KEY: optional(z.string().min(1)),
 
   /**
    * Signs inbound webhook deliveries. Set the same value in the TextBee
    * dashboard when creating the webhook - 20 characters minimum, per their
    * guidance.
    */
-  TEXTBEE_WEBHOOK_SECRET: z.string().min(20).optional(),
+  TEXTBEE_WEBHOOK_SECRET: optional(z.string().min(20)),
 });
 
 /**

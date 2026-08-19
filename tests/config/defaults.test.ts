@@ -1,3 +1,4 @@
+import { readFileSync } from "node:fs";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
 
 import { getEnv, resetEnvCache } from "@/config/env";
@@ -91,5 +92,59 @@ describe("configuration defaults", () => {
     expect(env.DASHBOARD_SESSION_HOURS).toBeGreaterThan(0);
     expect(env.SMS_INTRO_TEMPLATE.length).toBeGreaterThan(0);
     expect(env.SMS_HELP_TEMPLATE).toContain("STOP");
+  });
+});
+
+/**
+ * The bug this guards: .env.example ships genuinely optional keys as `KEY=""`
+ * so their existence is visible, and dotenv hands those through as empty
+ * strings. Zod's `.url()` and `.min(1)` reject an empty string exactly as they
+ * reject a wrong one, so a deployment that copied the example verbatim could
+ * not start - and the error named a key the person had deliberately left blank.
+ *
+ * Reads the real file rather than a hand-written list, so it keeps testing the
+ * thing that ships even as keys are added.
+ */
+describe("the shipped .env.example actually starts the app", () => {
+  function loadExample(): Record<string, string> {
+    const text = readFileSync(".env.example", "utf8");
+    const parsed: Record<string, string> = {};
+
+    for (const line of text.split(String.fromCharCode(10))) {
+      const match = line.match(/^([A-Z][A-Z0-9_]*)=(.*)$/);
+      if (!match) continue;
+      parsed[match[1]] = match[2].trim().replace(/^"|"$/g, "");
+    }
+
+    return parsed;
+  }
+
+  beforeEach(() => {
+    for (const [key, value] of Object.entries(loadExample())) {
+      process.env[key] = value;
+    }
+
+    // The example points at the default Postgres port and carries placeholder
+    // credentials; the five mandatory values are what a real deployment fills
+    // in, so supply those and leave everything else exactly as shipped.
+    process.env.DATABASE_URL = ORIGINAL.DATABASE_URL;
+    process.env.LEAD_WEBHOOK_SECRET = "0123456789abcdef0123";
+    process.env.BUSINESS_NAME = "Defaults Test Co";
+    process.env.BUSINESS_COUNTRY_CODE = "+1";
+    process.env.AI_PROVIDER = "anthropic";
+    process.env.ANTHROPIC_API_KEY = "sk-ant-not-a-real-key";
+    resetEnvCache();
+  });
+
+  it("validates with the file exactly as shipped", () => {
+    expect(() => getEnv()).not.toThrow();
+  });
+
+  it("treats a blank optional value as unset rather than as a value", () => {
+    // Not "" - undefined. The dashboard checks for undefined to decide whether
+    // it may serve at all, and "" would read as configured.
+    expect(getEnv().DASHBOARD_PASSWORD).toBeUndefined();
+    expect(getEnv().SMS_GATE_URL).toBeUndefined();
+    expect(getEnv().OWNER_PHONE).toBeUndefined();
   });
 });

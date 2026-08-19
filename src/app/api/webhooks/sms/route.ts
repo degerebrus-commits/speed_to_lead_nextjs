@@ -165,7 +165,7 @@ export async function POST(request: Request): Promise<Response> {
     // and someone who has opted out is exactly the person likely to ask how to
     // reach a human. It never reaches the model - a compliance reply is fixed
     // text, not a judgement call.
-    if (result.isNew && result.leadId && result.keyword === "help") {
+    if (result.isNew && !result.isEcho && result.leadId && result.keyword === "help") {
       const lead = await prisma.lead.findUnique({ where: { id: result.leadId } });
 
       if (lead) {
@@ -182,7 +182,10 @@ export async function POST(request: Request): Promise<Response> {
       }
     }
 
-    if (result.isNew && result.leadId && result.keyword === null) {
+    // !isEcho closes the loop: a handset registered as the gateway can report
+    // our own outbound texts as inbound, and replying to one makes the
+    // assistant answer itself until the quota runs out.
+    if (result.isNew && !result.isEcho && result.leadId && result.keyword === null) {
       const lead = await prisma.lead.findUnique({ where: { id: result.leadId } });
 
       if (lead) {

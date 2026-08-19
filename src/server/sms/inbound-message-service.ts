@@ -65,6 +65,46 @@ export interface InboundResult {
   messageId: string;
   leadId: string | null;
   keyword: "opt-out" | "opt-in" | "help" | null;
+  /**
+   * True when the message was recognised as our own text coming back, and
+   * stored without being answered. Never true against a real customer.
+   */
+  isEcho?: boolean;
+}
+
+/**
+ * How far back to look for a matching outbound message.
+ *
+ * Long enough to cover a slow gateway - TextBee has taken minutes to deliver -
+ * and short enough that a customer quoting us hours later is still answered.
+ */
+const ECHO_WINDOW_MS = 10 * 60 * 1000;
+
+/**
+ * Whether this inbound text is one of ours coming back.
+ *
+ * A handset registered as the gateway can report the messages it just sent as
+ * received, because sender and recipient are the same number. Left unguarded
+ * the assistant answers itself: reply, echo, reply, echo - booking appointments
+ * and spending SMS quota until someone notices.
+ *
+ * Only reachable while testing with one device. With a real gateway the
+ * business number and the customer's are never the same, so this can never fire
+ * on a genuine reply - nobody texts back the assistant's own wording verbatim,
+ * to the character, within ten minutes.
+ */
+async function isOurOwnMessageComingBack(phone: string, body: string): Promise<boolean> {
+  const echoed = await prisma.message.findFirst({
+    where: {
+      phone,
+      direction: "OUTBOUND",
+      body,
+      createdAt: { gte: new Date(Date.now() - ECHO_WINDOW_MS) },
+    },
+    select: { id: true },
+  });
+
+  return echoed !== null;
 }
 
 /**
@@ -102,6 +142,10 @@ export async function handleInboundMessage(
 
   const keyword = classifyKeyword(message);
 
+  // Before anything else. An echo must not opt the customer out, must not be
+  // classified, and must never reach the conversation.
+  const isEcho = await isOurOwnMessageComingBack(phone, message);
+
   try {
     const stored = await prisma.message.create({
       data: {
@@ -114,6 +158,25 @@ export async function handleInboundMessage(
         receivedAt: receivedAt ? new Date(receivedAt) : new Date(),
       },
     });
+
+      // An echo is stored so the loop is visible in the transcript, but it
+      // changes nothing and gets no reply. Our own booking confirmation ends
+      // with "Reply STOP to opt out" - classified as a keyword, that would opt
+      // the customer out of their own confirmation.
+      if (isEcho) {
+        logger.warn("Ignoring our own message reported back as inbound", {
+          phone,
+          providerMessageId,
+        });
+
+        return {
+          isNew: true,
+          messageId: stored.id,
+          leadId: lead?.id ?? null,
+          keyword: null,
+          isEcho: true,
+        };
+      }
 
     // HELP changes no consent state - it is a request for information, and
     // answering it is handled by the caller.
