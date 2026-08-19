@@ -417,3 +417,32 @@ fields to display by name and print only those. Anything arriving from a
 network call is assumed to carry credentials until each field has been looked
 at - and this is the fourth secret leaked in this project, every one of them a
 value I had not personally typed.
+
+---
+
+## Inferred a second system rather than asking who was at the keyboard
+
+**What happened.** A booking confirmation arrived on the test phone that this
+application had not sent - different wording from the template, absent from the
+`Message` table, present in TextBee's Sent log. I concluded another application
+was sharing the TextBee account, hunted for a second webhook subscription,
+queried the provider's API to enumerate them, and wrote it into `STATUS.md` as
+a blocker that made every SMS test untrustworthy.
+
+The user had typed it by hand in the TextBee dashboard's Send form.
+
+**Root cause.** The evidence was read as a technical mystery when it was a
+human action, and I never asked the one question that would have settled it in
+a sentence. The tell was in the message the whole time: the year read "22026".
+Applications do not typo. I noticed the mangled year, quoted it repeatedly as
+proof the message was foreign to our template, and did not draw the obvious
+conclusion from it.
+
+**The correct fix.** Corrected `STATUS.md`, which had recorded the wrong
+diagnosis as a blocker, and dropped the recommendation to rotate the API key -
+that key was never the problem.
+
+**Prevention rule.** When something appears that the system did not do, the
+first hypothesis is that a person did it, not that a second system exists. Ask.
+And treat evidence of human authorship - typos, inconsistent formatting, an
+odd hour - as evidence, rather than only as proof of what it is not.

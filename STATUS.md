@@ -90,12 +90,15 @@ enable Autostart, lock it in Recents, and drop the heartbeat interval. If a
 message then lands in seconds, the gateway is demo-viable - though still never
 launch-viable, for the A2P reason above.
 
-**Another application is sending through the same TextBee account.** A
-confirmation nobody here wrote ("Ok you are booked Aug 20, 22026 2PM") appears
-in TextBee's Sent log and in no row of our database. There is exactly one
-webhook subscription and it is ours, so the other app receives nothing - but
-sending needs only the API key. Any SMS test is polluted until that is
-resolved. Rotate `TEXTBEE_API_KEY` to cut it off.
+**Nothing else is sending through the TextBee account.** Settled 2026-08-19.
+A confirmation appearing in the Sent log and in no row of our database ("Ok you
+are booked Aug 20, 22026 2PM") was typed by hand in the TextBee dashboard's own
+Send form. There is one webhook subscription, one device, and one application.
+
+Recorded because two sessions were spent theorising about a second app, a
+shared API key and a duplicate webhook subscription, and all of it was wrong.
+The mangled year was the tell: applications do not typo. Before inferring a
+second system from an unexplained message, ask who was at the keyboard.
 
 **The Twilio provider is built and tested** - outbound through the REST API, and
 an inbound webhook verified against X-Twilio-Signature, which signs the request
