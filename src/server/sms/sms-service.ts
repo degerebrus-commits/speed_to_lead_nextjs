@@ -5,6 +5,7 @@ import { prisma } from "@/lib/db";
 import { logger } from "@/lib/logger";
 import { consoleSmsProvider } from "./console-sms-provider";
 import { smsGateProvider } from "./sms-gate-provider";
+import { twilioSmsProvider } from "./twilio-sms-provider";
 import { textBeeSmsProvider } from "./textbee-sms-provider";
 import type { SmsProvider } from "./sms-provider";
 import { buildIntroMessage, renderTemplate } from "./sms-templates";
@@ -22,9 +23,12 @@ export function getSmsProvider(): SmsProvider {
   const { SMS_PROVIDER } = getEnv();
 
   if (SMS_PROVIDER === "twilio") {
-    // Fail loudly rather than silently logging to console: a deployment that
-    // believes it is texting customers and is not would be worse than a crash.
-    throw new Error("SMS_PROVIDER=twilio is not implemented yet - it needs the client's account");
+    // Same test guard as the handset relays: nothing may reach a paid API
+    // during a test run, whatever a stray .env says.
+    if (process.env.NODE_ENV === "test") {
+      throw new Error("Refusing to use the real SMS gateway during tests");
+    }
+    return twilioSmsProvider;
   }
 
   if (SMS_PROVIDER === "textbee" || SMS_PROVIDER === "sms-gate") {

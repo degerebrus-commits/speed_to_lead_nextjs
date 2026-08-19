@@ -130,6 +130,30 @@ const baseSchema = z.object({
    */
   SMS_GATE_WEBHOOK_SECRET: optional(z.string().min(24)),
 
+  /**
+   * Twilio. Required only when SMS_PROVIDER=twilio.
+   *
+   * The only gateway that can be A2P 10DLC registered, so the only one that
+   * can text a real customer at scale. The handset relays are for development.
+   *
+   * On a trial account Twilio will only deliver to numbers verified in the
+   * console, and prefixes every message with a trial notice - both disappear
+   * on upgrade.
+   */
+  TWILIO_ACCOUNT_SID: optional(z.string().min(1)),
+  TWILIO_AUTH_TOKEN: optional(z.string().min(1)),
+  /**
+   * The exact public URL Twilio is configured to call.
+   *
+   * Part of what Twilio signs, so it cannot be read off the request: behind a
+   * tunnel or proxy the host the app sees is not the host Twilio called, and
+   * every signature would fail.
+   */
+  TWILIO_WEBHOOK_URL: optional(z.string().url()),
+
+  /** The Twilio number messages are sent from, in E.164. */
+  TWILIO_FROM_NUMBER: optional(z.string().regex(/^[+][1-9]d{7,14}$/, "must be E.164")),
+
   // Required only when SMS_PROVIDER=textbee - see the refinement below.
   TEXTBEE_API_KEY: optional(z.string().min(1)),
   TEXTBEE_DEVICE_ID: optional(z.string().min(1)),
@@ -279,6 +303,18 @@ const envSchema = baseSchema.superRefine((env, ctx) => {
           code: z.ZodIssueCode.custom,
           path: [key],
           message: "is required when SMS_PROVIDER=textbee",
+        });
+      }
+    }
+  }
+
+  if (env.SMS_PROVIDER === "twilio") {
+    for (const key of ["TWILIO_ACCOUNT_SID", "TWILIO_AUTH_TOKEN", "TWILIO_FROM_NUMBER"] as const) {
+      if (!env[key]) {
+        ctx.addIssue({
+          code: z.ZodIssueCode.custom,
+          path: [key],
+          message: "is required when SMS_PROVIDER=twilio",
         });
       }
     }
