@@ -64,7 +64,7 @@ for the client to read directly.
 Settled 2026-08-19 after two clean tests. TextBee accepts a message, returns a
 real provider id in about two seconds, and the phone never delivers it -
 yesterday three messages arrived hours late, today one never arrived at all.
-Inbound has never once been captured, in either direction of testing.
+Inbound works. It always did - this code was rejecting it.
 
 That is not a code problem. Every line past the signature check cannot tell a
 signed POST from a real delivery, and the full booking flow was proven that way:

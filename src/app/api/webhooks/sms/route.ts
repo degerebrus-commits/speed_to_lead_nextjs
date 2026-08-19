@@ -8,6 +8,8 @@ import { prisma } from "@/lib/db";
 import {
   handleInboundMessage,
   inboundMessageSchema,
+  normalizeTextBeePayload,
+  type InboundMessagePayload,
 } from "@/server/sms/inbound-message-service";
 import { sendHelpReply } from "@/server/sms/sms-service";
 
@@ -112,6 +114,23 @@ export async function POST(request: Request): Promise<Response> {
     return Response.json({ received: true, event: eventName }, { status: 200 });
   }
 
+  // TextBee does not send the documented shape. Real deliveries arrive flat,
+  // with the event under "webhookEvent" and the message fields at the top
+  // level - they were being rejected here as unrecognised for two days while
+  // the handset was blamed for not capturing anything.
+  //
+  // Checked before the event-name branch below, because those payloads carry
+  // no "event" field at all and would otherwise be logged and discarded.
+  const flat = normalizeTextBeePayload(payload);
+
+  if (flat) {
+    // The flat payload has no separate delivery timestamp to check for
+    // freshness; receivedAt is carried through as the timestamp, and the
+    // unique constraint on providerMessageId is what actually prevents a
+    // replay being processed twice.
+    return respondToInbound(flat);
+  }
+
   if (eventName !== "MESSAGE_RECEIVED") {
     // Log the payload's shape - key names only, never values - so an
     // unexpected provider format can be identified without putting a
@@ -152,8 +171,18 @@ export async function POST(request: Request): Promise<Response> {
     return errorResponse(400, "VALIDATION_FAILED", "Delivery timestamp is missing or too old.");
   }
 
+  return respondToInbound(parsed.data);
+}
+
+/**
+ * Stores an inbound message and decides the reply.
+ *
+ * Shared by both accepted payload shapes so the documented one and the one
+ * TextBee actually sends cannot drift apart in how they are handled.
+ */
+async function respondToInbound(payload: InboundMessagePayload): Promise<Response> {
   try {
-    const result = await handleInboundMessage(parsed.data);
+    const result = await handleInboundMessage(payload);
 
     let replyKind: string = "none";
 
@@ -190,7 +219,7 @@ export async function POST(request: Request): Promise<Response> {
 
       if (lead) {
         try {
-          const outcome = await handleCustomerReply(lead, parsed.data.data.message);
+          const outcome = await handleCustomerReply(lead, payload.data.message);
           replyKind = outcome.kind;
         } catch (error) {
           // The inbound message is already stored. Failing the webhook now

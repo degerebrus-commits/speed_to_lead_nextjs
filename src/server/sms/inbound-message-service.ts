@@ -6,9 +6,9 @@ import { logger } from "@/lib/logger";
 import { PhoneNormalizationError, normalizePhone } from "@/lib/phone";
 
 /**
- * Shape of a TextBee MESSAGE_RECEIVED delivery. Only the fields we rely on are
- * required - providers add fields over time and a stricter schema would start
- * rejecting valid traffic.
+ * Shape of an inbound delivery. Only the fields we rely on are required -
+ * providers add fields over time and a stricter schema would start rejecting
+ * valid traffic.
  */
 export const inboundMessageSchema = z.object({
   event: z.string(),
@@ -22,6 +22,58 @@ export const inboundMessageSchema = z.object({
 });
 
 export type InboundMessagePayload = z.infer<typeof inboundMessageSchema>;
+
+/**
+ * What TextBee actually sends, which is not what the shape above expects.
+ *
+ * Discovered 2026-08-19 by reading the rejection log: real deliveries were
+ * arriving with a valid signature and being turned away as "Unrecognised SMS
+ * webhook event", because the event field is `webhookEvent` rather than
+ * `event` and the message fields sit at the top level rather than under
+ * `data`. Inbound capture had been working the whole time; this code was
+ * rejecting it, and the failure looked exactly like a broken handset.
+ *
+ * Kept as a separate schema rather than loosening the one above, so the
+ * documented shape stays documented and the divergence is visible.
+ */
+export const textBeeFlatMessageSchema = z.object({
+  webhookEvent: z.string().optional(),
+  smsId: z.string().min(1).optional(),
+  idempotencyKey: z.string().min(1).optional(),
+  sender: z.string().min(1),
+  message: z.string(),
+  receivedAt: z.string().optional(),
+});
+
+/**
+ * Converts TextBee's flat payload into the shape the rest of the code expects.
+ *
+ * Returns null when it is not a received-message event, so delivery receipts
+ * and anything unrecognised fall through to the caller's own handling.
+ */
+export function normalizeTextBeePayload(body: unknown): InboundMessagePayload | null {
+  const parsed = textBeeFlatMessageSchema.safeParse(body);
+  if (!parsed.success) return null;
+
+  const { webhookEvent, smsId, idempotencyKey, sender, message, receivedAt } = parsed.data;
+
+  // Deliberately permissive about the event name. The field arrived as
+  // "webhookEvent" with an undocumented value, and a payload carrying both a
+  // sender and a message body is a received message whatever it calls itself -
+  // being strict here is what caused the original failure.
+  if (webhookEvent && /sent|delivered|failed/i.test(webhookEvent)) return null;
+
+  // smsId is the provider's own id and the better idempotency key; the
+  // idempotencyKey field is the documented fallback.
+  const id = smsId ?? idempotencyKey;
+  if (!id) return null;
+
+  return {
+    event: "MESSAGE_RECEIVED",
+    timestamp: receivedAt ?? new Date().toISOString(),
+    data: { _id: id, sender, message, receivedAt },
+  };
+}
 
 /**
  * Keywords that opt a customer out. Consumer SMS regulations require honouring
