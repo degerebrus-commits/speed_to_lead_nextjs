@@ -3,6 +3,7 @@ import { resetEnvCache } from "@/config/env";
 import { prisma } from "@/lib/db";
 import { setAiProviderForTesting } from "@/server/ai/ai-service";
 import { handleCustomerReply } from "@/server/ai/conversation-service";
+import { resolveCandidatesByKeys } from "@/server/booking/booking-service";
 import type { SmsMessage, SmsProvider } from "@/server/sms/sms-provider";
 import { setSmsProviderForTesting } from "@/server/sms/sms-service";
 
@@ -181,10 +182,24 @@ describe("handleCustomerReply", () => {
 
       expect(outcome.kind).toBe("slots-offered");
       expect(ai.calls).toBe(0);
-      expect(sent[0].body).toContain("1) Mon-Fri 9am");
 
       const updated = await prisma.lead.findUniqueOrThrow({ where: { id: lead.id } });
       expect(updated.status).toBe("APPOINTMENT_PENDING");
+
+      // Three options, and the numbering the customer sees must match the
+      // order recorded against the lead - that record is what the reply is
+      // resolved against later.
+      expect(updated.offeredSlotKeys).toHaveLength(3);
+
+      const offered = resolveCandidatesByKeys(updated.offeredSlotKeys);
+      offered.forEach((slot, index) => {
+        expect(sent[0].body).toContain(`${index + 1}) ${slot.display}`);
+      });
+
+      // Deliberately not asserting a specific label: the list is chronological,
+      // so which window comes first depends on the time of day the suite runs.
+      // Pinning one here passes all morning and fails after lunch.
+      expect(sent[0].body).toContain("reply with the number");
     });
 
     it("does not book when a number appears in an ordinary description", async () => {
@@ -229,7 +244,119 @@ describe("handleCustomerReply", () => {
       const outcome = await handleCustomerReply(lead, "can you do Sat 10am");
 
       expect(outcome.kind).toBe("booked");
-      expect(outcome.reply).toContain("Sat 10am");
+      // The confirmation carries the dated form, so the time survives but the
+      // recurring-window wording does not.
+      expect(outcome.reply).toContain("10am");
+      expect(outcome.reply).toContain("Sat");
+
+      const appointment = await prisma.appointment.findFirstOrThrow({
+        where: { leadId: lead.id },
+      });
+      expect(appointment.slotLabel).toBe("Sat 10am");
+    });
+
+    it("offers a different set when the customer turns the first one down", async () => {
+      const ai = installAi("should not be used");
+      const lead = await seedLead();
+
+      await handleCustomerReply(lead, "Can I book someone in?");
+      const first = (await prisma.lead.findUniqueOrThrow({ where: { id: lead.id } }))
+        .offeredSlotKeys;
+
+      const outcome = await handleCustomerReply(lead, "none of those work for me");
+
+      expect(outcome.kind).toBe("slots-offered");
+      // Never the model: a rejection is a request for different times, and
+      // asking the AI to invent availability is how a customer gets told about
+      // a slot that does not exist.
+      expect(ai.calls).toBe(0);
+
+      const after = await prisma.lead.findUniqueOrThrow({ where: { id: lead.id } });
+
+      // A genuinely different set, and the first is remembered as declined so
+      // it cannot come back around.
+      expect(after.offeredSlotKeys).toHaveLength(3);
+      for (const key of after.offeredSlotKeys) {
+        expect(first).not.toContain(key);
+      }
+      expect(after.declinedSlotKeys).toEqual(expect.arrayContaining(first));
+      expect(after.status).toBe("APPOINTMENT_PENDING");
+
+      // And the customer is told these are new ones rather than being sent the
+      // same message twice.
+      expect(sent.at(-1)!.body).toContain("next few");
+    });
+
+    it("books from the second set, at the date that set offered", async () => {
+      installAi("should not be used");
+      const lead = await seedLead();
+
+      await handleCustomerReply(lead, "Can I book someone in?");
+      await handleCustomerReply(lead, "none of those work");
+
+      const second = resolveCandidatesByKeys(
+        (await prisma.lead.findUniqueOrThrow({ where: { id: lead.id } })).offeredSlotKeys,
+      );
+
+      const outcome = await handleCustomerReply(lead, "1");
+
+      expect(outcome.kind).toBe("booked");
+
+      const appointment = await prisma.appointment.findFirstOrThrow({
+        where: { leadId: lead.id },
+      });
+      // The occurrence from the *second* list. Re-resolving the label here
+      // would book the soonest instead - a date this customer already refused.
+      expect(appointment.slotKey).toBe(second[0].key);
+      expect(appointment.scheduledAt?.toISOString()).toBe(second[0].at.toISOString());
+    });
+
+    it("hands off to a person once every slot has been turned down", async () => {
+      // One window, so the horizon runs out quickly.
+      process.env.AVAILABLE_TIME_SLOTS = "Sat 10am";
+      process.env.SLOT_OFFER_COUNT = "3";
+      resetEnvCache();
+
+      installAi("should not be used");
+      const lead = await seedLead();
+
+      await handleCustomerReply(lead, "Can I book someone in?");
+
+      // Keep refusing until the assistant gives up. Bounded so a bug that
+      // never exhausts fails the test rather than hanging it.
+      let outcome = await handleCustomerReply(lead, "none of those work");
+      for (let attempt = 0; attempt < 5 && outcome.kind === "slots-offered"; attempt += 1) {
+        outcome = await handleCustomerReply(lead, "none of those work");
+      }
+
+      expect(outcome.kind).toBe("handoff");
+      expect(outcome.escalated).toBe(true);
+      expect(outcome.reply).toContain("team");
+
+      const after = await prisma.lead.findUniqueOrThrow({ where: { id: lead.id } });
+      expect(after.status).toBe("HUMAN_HANDOFF");
+      // Nothing was booked on the way out.
+      expect(await prisma.appointment.count({ where: { leadId: lead.id } })).toBe(0);
+    });
+
+    it("does not treat a problem description starting with 'no' as a rejection", async () => {
+      // A message opening with "no" must not be read as "none of those work",
+      // which would burn a set of slots and offer times nobody asked about.
+      // Deliberately not "no heat" - that is an emergency keyword and never
+      // reaches this branch at all.
+      const ai = installAi("Understood - I'll keep that in mind.");
+      const lead = await seedLead();
+
+      await handleCustomerReply(lead, "Can I book someone in?");
+      const offered = (await prisma.lead.findUniqueOrThrow({ where: { id: lead.id } }))
+        .offeredSlotKeys;
+
+      await handleCustomerReply(lead, "no rush on this one");
+
+      const after = await prisma.lead.findUniqueOrThrow({ where: { id: lead.id } });
+      expect(after.offeredSlotKeys).toEqual(offered);
+      expect(after.declinedSlotKeys).toHaveLength(0);
+      expect(ai.calls).toBe(1);
     });
 
     it("books the chosen slot and confirms it", async () => {
@@ -237,16 +364,26 @@ describe("handleCustomerReply", () => {
       const lead = await seedLead();
 
       await handleCustomerReply(lead, "Can I book someone in?");
+
+      // What "2" refers to, captured from the offer rather than assumed.
+      const offered = resolveCandidatesByKeys(
+        (await prisma.lead.findUniqueOrThrow({ where: { id: lead.id } })).offeredSlotKeys,
+      );
+      const second = offered[1];
+
       const outcome = await handleCustomerReply(lead, "2");
 
       expect(outcome.kind).toBe("booked");
       expect(ai.calls).toBe(0);
-      expect(outcome.reply).toContain("Mon-Fri 11am");
+      expect(outcome.reply).toContain(second.display);
 
       const appointment = await prisma.appointment.findFirstOrThrow({
         where: { leadId: lead.id },
       });
-      expect(appointment.slotLabel).toBe("Mon-Fri 11am");
+      // The second option offered, not the second configured window - the two
+      // differ as soon as the list is chronological.
+      expect(appointment.slotLabel).toBe(second.label);
+      expect(appointment.slotKey).toBe(second.key);
       expect(appointment.confirmationSentAt).not.toBeNull();
 
       const updated = await prisma.lead.findUniqueOrThrow({ where: { id: lead.id } });

@@ -227,6 +227,23 @@ const baseSchema = z.object({
   // --- Booking (Phase 5) ---------------------------------------------------
   BOOKING_MODE: z.enum(["fixed", "calendar"]).default("fixed"),
   APPOINTMENT_DURATION_MINUTES: z.coerce.number().int().positive().default(90),
+  // How many options the customer is offered at once. Three is the default
+  // because it is the most a person can weigh in a text message without
+  // re-reading it, and because every option listed is a chance to reply with
+  // something the number-matcher cannot resolve. Capped at 9: the matcher
+  // reads a single digit, and a tenth option could never be chosen.
+  SLOT_OFFER_COUNT: z.coerce.number().int().min(1).max(9).default(3),
+
+  // --- Google Calendar ---
+  // A service account, so nothing has to sign in interactively. All three
+  // are optional: without them booking still works and writes to the
+  // database only, which is what the console and fixed-slot demo need.
+  GOOGLE_CLIENT_EMAIL: optional(z.string().email()),
+  GOOGLE_PRIVATE_KEY: optional(z.string().min(40)),
+  // The calendar to write to. Usually the business owner's address, or a
+  // dedicated calendar shared with the service account as "Make changes to
+  // events" - sharing as read-only fails at insert with a 403.
+  GOOGLE_CALENDAR_ID: optional(z.string().min(3)),
   AVAILABLE_TIME_SLOTS: z.string().default(""),
 
   // --- Trade / vertical ----------------------------------------------------

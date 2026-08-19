@@ -52,6 +52,28 @@ process.env.RATE_LIMIT_WINDOW_MS = "60000";
 // SMS_INTRO_TEMPLATE is left unset so the suite exercises the shipped default.
 delete process.env.SMS_INTRO_TEMPLATE;
 
+/**
+ * Cuts the suite off from Google.
+ *
+ * Called from beforeEach rather than at module scope, and that placement is
+ * the whole point: deleting these at the top of this file does not hold.
+ * Vitest loads .env through Vite after setup modules are evaluated, which put
+ * the real service account back before a single test ran - so the booking
+ * specs were quietly making live Calendar API calls against the business's
+ * real calendar, and its 19 real events were filtering the offered slots down
+ * to nothing. The symptom was three unrelated specs failing on availability.
+ *
+ * Empty string rather than delete, because that is what env.ts treats as
+ * unset and it survives a reload that a delete does not.
+ *
+ * A spec that wants the calendar path installs its own fetch double.
+ */
+function isolateFromGoogle(): void {
+  process.env.GOOGLE_CLIENT_EMAIL = "";
+  process.env.GOOGLE_PRIVATE_KEY = "";
+  process.env.GOOGLE_CALENDAR_ID = "";
+}
+
 // These tests truncate tables. Refuse to touch a database that is not visibly a
 // test database - the seeded development data is one connection string away and
 // would be destroyed silently.
@@ -67,7 +89,14 @@ const { setSmsProviderForTesting } = await import("@/server/sms/sms-service");
 const { setAiProviderForTesting } = await import("@/server/ai/ai-service");
 const { randomUUID } = await import("node:crypto");
 
+const { resetEnvCache } = await import("@/config/env");
+
 beforeEach(async () => {
+  isolateFromGoogle();
+  // The cache is what the code actually reads; clearing the variables without
+  // this leaves a previously parsed configuration in place.
+  resetEnvCache();
+
   await prisma.$executeRawUnsafe('TRUNCATE TABLE "Appointment", "Message", "Lead" RESTART IDENTITY CASCADE');
   resetRateLimits();
 

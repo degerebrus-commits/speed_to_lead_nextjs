@@ -35,3 +35,9 @@ tsconfig.tsbuildinfo
 
 # local logs
 *.log
+
+# Backups of .env taken before a risky edit. These hold the same secrets as
+# .env itself - a service account private key among them - and the bare ".env"
+# rule above does not match them.
+.env.backup*
+.env.*.bak

@@ -4,7 +4,24 @@ import { resetEnvCache } from "@/config/env";
 import { prisma } from "@/lib/db";
 import { handleCustomerReply } from "@/server/ai/conversation-service";
 import { detectAppointmentIntent } from "@/server/booking/appointment-changes";
-import { bookSlot, getAvailableSlots } from "@/server/booking/booking-service";
+import {
+  type SlotCandidate,
+  bookSlot,
+  getOpenSlotCandidates,
+} from "@/server/booking/booking-service";
+import {
+  buildScheduledSlotKey,
+  formatSlotForCustomer,
+  resolveNextOccurrence,
+} from "@/server/booking/slot-schedule";
+
+/** The candidate the offer code would build for `label` as of `now`. */
+function candidateAt(label: string, now: Date): SlotCandidate {
+  const at = resolveNextOccurrence(label, now);
+  if (at === null) throw new Error(`Test fixture: "${label}" does not resolve`);
+
+  return { label, at, key: buildScheduledSlotKey(label, at), display: formatSlotForCustomer(at) };
+}
 import type { SmsMessage, SmsProvider } from "@/server/sms/sms-provider";
 import { setSmsProviderForTesting } from "@/server/sms/sms-service";
 
@@ -92,22 +109,23 @@ describe("cancelling", () => {
     const sent = installSpySms();
     const lead = await seedLead();
 
-    await bookSlot(lead, "Mon-Fri 9am", AT);
-    expect(await getAvailableSlots(AT)).not.toContain("Mon-Fri 9am");
+    await bookSlot(lead, candidateAt("Mon-Fri 9am", AT));
+    const bookedKey = candidateAt("Mon-Fri 9am", AT).key;
+    expect((await getOpenSlotCandidates(AT)).map((s) => s.key)).not.toContain(bookedKey);
 
     const outcome = await handleCustomerReply(lead, "cancel my appointment please");
 
     expect(outcome.kind).toBe("cancelled");
     // The whole point: before this existed nothing set CANCELLED, so a slot
     // taken by mistake was gone until someone edited SQL by hand.
-    expect(await getAvailableSlots(AT)).toContain("Mon-Fri 9am");
+    expect((await getOpenSlotCandidates(AT)).map((s) => s.key)).toContain(bookedKey);
     expect(sent.at(-1)!.body).toContain("cancelled");
   });
 
   it("marks the appointment CANCELLED rather than deleting it", async () => {
     installSpySms();
     const lead = await seedLead();
-    await bookSlot(lead, "Mon-Fri 9am", AT);
+    await bookSlot(lead, candidateAt("Mon-Fri 9am", AT));
 
     await handleCustomerReply(lead, "cancel please");
 
@@ -135,23 +153,27 @@ describe("rescheduling", () => {
   it("releases the old slot and offers times again, including the released one", async () => {
     const sent = installSpySms();
     const lead = await seedLead();
-    await bookSlot(lead, "Mon-Fri 9am", AT);
+    const original = candidateAt("Mon-Fri 9am", AT);
+    await bookSlot(lead, original);
 
     const outcome = await handleCustomerReply(lead, "can we reschedule");
 
     expect(outcome.kind).toBe("slots-offered");
-    // Released first, so the customer is not told their own booking makes that
-    // time unavailable.
-    expect(sent.at(-1)!.body).toContain("Mon-Fri 9am");
 
     const updated = await prisma.lead.findUniqueOrThrow({ where: { id: lead.id } });
     expect(updated.status).toBe("APPOINTMENT_PENDING");
+
+    // Released first, so the customer is not told their own booking makes that
+    // time unavailable. Asserted on the key rather than the label, because the
+    // same weekly window appears on other dates regardless.
+    expect(updated.offeredSlotKeys).toContain(original.key);
+    expect(sent.at(-1)!.body).toContain(original.display);
   });
 
   it("lets the customer then pick a new slot", async () => {
     installSpySms();
     const lead = await seedLead();
-    await bookSlot(lead, "Mon-Fri 9am", AT);
+    await bookSlot(lead, candidateAt("Mon-Fri 9am", AT));
 
     await handleCustomerReply(lead, "can we reschedule");
     const outcome = await handleCustomerReply(lead, "2");
@@ -170,7 +192,7 @@ describe("ordering", () => {
   it("an emergency still outranks a cancellation", async () => {
     installSpySms();
     const lead = await seedLead();
-    await bookSlot(lead, "Mon-Fri 9am", AT);
+    await bookSlot(lead, candidateAt("Mon-Fri 9am", AT));
 
     const outcome = await handleCustomerReply(lead, "cancel that, I smell a gas leak");
 

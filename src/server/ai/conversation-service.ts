@@ -1,5 +1,6 @@
 import type { Lead } from "@prisma/client";
 import {
+  getBookingSettings,
   getBusinessProfile,
   getMessageTemplates,
   isAfterHoursReplyEnabled,
@@ -10,8 +11,11 @@ import {
   bookSlot,
   buildSlotOffer,
   getAvailableSlots,
+  getOpenSlotCandidates,
   hasBookingIntent,
   matchSlotChoice,
+  resolveCandidatesByKeys,
+  wantsDifferentSlots,
 } from "@/server/booking/booking-service";
 import {
   cancelAppointment,
@@ -32,6 +36,8 @@ export type ReplyKind =
   | "booked"
   | "cancelled"
   | "nothing-to-cancel"
+  /// Every offerable slot was turned down; a person takes over from here.
+  | "handoff"
   | "ai"
   | "none";
 
@@ -169,7 +175,13 @@ export async function handleCustomerReply(
 
     await prisma.lead.update({
       where: { id: lead.id },
-      data: { status: remaining.length > 0 ? "APPOINTMENT_PENDING" : "HUMAN_HANDOFF" },
+      data: {
+        status: remaining.length > 0 ? "APPOINTMENT_PENDING" : "HUMAN_HANDOFF",
+        offeredSlotKeys: remaining.map((slot) => slot.key),
+        // A reschedule starts the search fresh. Times turned down before they
+        // booked say nothing about what suits them now.
+        declinedSlotKeys: [],
+      },
     });
 
     logger.info("Appointment released for reschedule", {
@@ -189,23 +201,89 @@ export async function handleCustomerReply(
   // product's stated goals - a customer who texts at 2am asking for a slot
   // should get one, not an apology. Only open-ended conversation waits for
   // the morning.
-  const offeredSlots = await getAvailableSlots();
+  // Read from the database rather than the passed-in lead: the offer may have
+  // been made on an earlier turn, leaving the caller's copy stale. Trusting
+  // that copy would silently re-open the bug this guard exists to close.
+  const current = await prisma.lead.findUnique({
+    where: { id: lead.id },
+    select: { status: true, offeredSlotKeys: true, declinedSlotKeys: true },
+  });
 
-  if (offeredSlots.length > 0) {
-    // APPOINTMENT_PENDING is set only by the offer branch below, so it is the
-    // record of having shown this customer a numbered list. A digit counts as
-    // a choice only after that; a slot label still counts at any time.
-    //
-    // Read from the database rather than the passed-in lead: the offer may have
-    // been made on an earlier turn, leaving the caller's copy stale. Trusting
-    // that copy would silently re-open the bug this guard exists to close.
-    const current = await prisma.lead.findUnique({
+  // APPOINTMENT_PENDING is set only by the offer branches below, so it is the
+  // record of having shown this customer a numbered list. A digit counts as a
+  // choice only after that; a slot label still counts at any time.
+  const wasOfferedSlots = current?.status === "APPOINTMENT_PENDING";
+  const declined = current?.declinedSlotKeys ?? [];
+
+  // What they are actually looking at, not a freshly computed list. If
+  // anything was booked since the offer, recomputing would renumber it under
+  // them and "2" would book a different visit than the one they read.
+  const previouslyOffered = resolveCandidatesByKeys(current?.offeredSlotKeys ?? []);
+
+  // --- 3a. "None of those work" ------------------------------------------
+  // Before anything else in the booking block: an explicit rejection is a
+  // request for different times, not a conversation turn for the model.
+  if (wasOfferedSlots && wantsDifferentSlots(inboundBody)) {
+    const burned = [...new Set([...declined, ...(current?.offeredSlotKeys ?? [])])];
+    const nextSet = await getAvailableSlots(new Date(), burned);
+
+    if (nextSet.length > 0) {
+      const reply = buildSlotOffer(nextSet, true);
+      await sendConversationSms(lead, reply);
+
+      await prisma.lead.update({
+        where: { id: lead.id },
+        data: {
+          status: "APPOINTMENT_PENDING",
+          offeredSlotKeys: nextSet.map((slot) => slot.key),
+          declinedSlotKeys: burned,
+        },
+      });
+
+      logger.info("Further slots offered after rejection", {
+        leadId: lead.id,
+        slotCount: nextSet.length,
+        declinedCount: burned.length,
+      });
+      return { kind: "slots-offered", reply, escalated: false };
+    }
+
+    // Everything inside the horizon has been turned down. A person takes it
+    // from here rather than the assistant apologising in a loop.
+    const reply =
+      "I've run out of times I can offer you directly - let me get someone from the team to call you and find something that works.";
+    await sendConversationSms(lead, reply);
+
+    await prisma.lead.update({
       where: { id: lead.id },
-      select: { status: true },
+      data: { status: "HUMAN_HANDOFF", declinedSlotKeys: burned },
     });
 
-    const wasOfferedSlots = current?.status === "APPOINTMENT_PENDING";
-    const chosen = matchSlotChoice(inboundBody, offeredSlots, wasOfferedSlots);
+    logger.warn("Slot options exhausted; handing off", {
+      leadId: lead.id,
+      declinedCount: burned.length,
+    });
+    return { kind: "handoff", reply, escalated: true };
+  }
+
+  // Everything open, then the top few to actually offer. One lookup, because
+  // the label pass below has to see slots beyond the three on the table: a
+  // customer naming "Sat 10am" means it whether or not Saturday made this
+  // week's shortlist.
+  const openCandidates = await getOpenSlotCandidates(new Date(), declined);
+  const offeredSlots = openCandidates.slice(0, getBookingSettings().offerCount);
+
+  if (openCandidates.length > 0 || previouslyOffered.length > 0) {
+    // Two passes, and the order matters.
+    //
+    // First against what this customer was actually shown, where a bare digit
+    // is meaningful. Then against what is open right now with digits refused -
+    // that second pass is what lets someone book by naming a time before any
+    // list existed ("can you do Sat 10am"), which a digit could never do
+    // safely.
+    const chosen =
+      matchSlotChoice(inboundBody, previouslyOffered, wasOfferedSlots) ??
+      matchSlotChoice(inboundBody, openCandidates, false);
 
     if (chosen) {
       const booking = await bookSlot(lead, chosen);
@@ -225,7 +303,7 @@ export async function handleCustomerReply(
       if (booking.failure === "slot-taken") {
         // Taken between offer and reply. Re-offer what is actually left
         // rather than apologising for a slot that may still be free.
-        const remaining = await getAvailableSlots();
+        const remaining = await getAvailableSlots(new Date(), declined);
 
         const reply =
           remaining.length > 0
@@ -233,17 +311,31 @@ export async function handleCustomerReply(
             : "Sorry, that one just went and I have nothing else free right now - the team will call you to sort a time.";
 
         await sendConversationSms(lead, reply);
+
+        // The new numbering has to be recorded, or the next reply is matched
+        // against the list this one just replaced.
+        await prisma.lead.update({
+          where: { id: lead.id },
+          data: {
+            status: remaining.length > 0 ? "APPOINTMENT_PENDING" : "HUMAN_HANDOFF",
+            offeredSlotKeys: remaining.map((slot) => slot.key),
+          },
+        });
+
         return { kind: "slots-offered", reply, escalated: false };
       }
     }
 
-    if (hasBookingIntent(inboundBody)) {
+    if (hasBookingIntent(inboundBody) && offeredSlots.length > 0) {
       const reply = buildSlotOffer(offeredSlots);
       await sendConversationSms(lead, reply);
 
       await prisma.lead.update({
         where: { id: lead.id },
-        data: { status: "APPOINTMENT_PENDING" },
+        data: {
+          status: "APPOINTMENT_PENDING",
+          offeredSlotKeys: offeredSlots.map((slot) => slot.key),
+        },
       });
 
       logger.info("Slots offered", { leadId: lead.id, slotCount: offeredSlots.length });

@@ -179,6 +179,88 @@ export function resolveNextOccurrence(
 }
 
 /**
+ * How far ahead to look for open slots.
+ *
+ * Three weeks. Long enough that a customer who turns down everything in the
+ * next few days still gets offered something real, short enough that nobody is
+ * asked to commit to a date they cannot plan around.
+ */
+export const SLOT_HORIZON_DAYS = 21;
+
+/**
+ * Every occurrence of a slot within the horizon, earliest first.
+ *
+ * resolveNextOccurrence answers "when is the next one", which is all a single
+ * offer needs. Offering a *second* set after the customer turns down the first
+ * needs the ones after that, so this returns the whole run.
+ */
+export function resolveOccurrences(
+  label: string,
+  now: Date = new Date(),
+  horizonDays: number = SLOT_HORIZON_DAYS,
+  timeZone: string = getBusinessProfile().timezone,
+): Date[] {
+  const parsed = parseSlotLabel(label);
+  if (parsed === null) return [];
+
+  const wanted = new Set(parsed.weekdays);
+  const found: Date[] = [];
+
+  for (let offset = 0; offset <= horizonDays; offset += 1) {
+    const probe = new Date(now.getTime() + offset * 24 * 60 * 60 * 1000);
+    const local = wallClock(probe, timeZone);
+
+    if (!wanted.has(local.isoWeekday)) continue;
+
+    const candidate = instantForWallClock(
+      local.year,
+      local.month,
+      local.day,
+      parsed.hour,
+      parsed.minute,
+      timeZone,
+    );
+
+    if (candidate.getTime() > now.getTime()) found.push(candidate);
+  }
+
+  return found;
+}
+
+/**
+ * How a slot is written to the customer: "Mon Aug 25, 9am".
+ *
+ * Carries the date, not just the weekday. The configured labels describe
+ * recurring windows, so "Mon 9am" is ambiguous the moment a second week of
+ * availability is on offer - and it is exactly then that someone turns down
+ * the first set and gets shown the next.
+ */
+export function formatSlotForCustomer(
+  at: Date,
+  timeZone: string = getBusinessProfile().timezone,
+): string {
+  const parts = new Intl.DateTimeFormat("en-US", {
+    timeZone,
+    weekday: "short",
+    month: "short",
+    day: "numeric",
+    hour: "numeric",
+    minute: "2-digit",
+    hour12: true,
+  }).formatToParts(at);
+
+  const get = (type: string) => parts.find((p) => p.type === type)?.value ?? "";
+
+  const minute = get("minute");
+  const time =
+    minute === "00"
+      ? `${get("hour")}${get("dayPeriod").toLowerCase()}`
+      : `${get("hour")}:${minute}${get("dayPeriod").toLowerCase()}`;
+
+  return `${get("weekday")} ${get("month")} ${get("day")}, ${time}`;
+}
+
+/**
  * The booking key: the resolved date plus the label.
  *
  * The date is what makes this repeatable. Keyed on the label alone, a slot was

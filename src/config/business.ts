@@ -56,6 +56,8 @@ export interface MessageTemplates {
 export interface BookingSettings {
   mode: "fixed" | "calendar";
   durationMinutes: number;
+  /** How many options to put in front of the customer at once. */
+  offerCount: number;
   /** Parsed from the comma-separated list; empty when none configured. */
   fixedSlots: string[];
 }
@@ -99,6 +101,7 @@ export function getBookingSettings(): BookingSettings {
   return {
     mode: env.BOOKING_MODE,
     durationMinutes: env.APPOINTMENT_DURATION_MINUTES,
+    offerCount: env.SLOT_OFFER_COUNT,
     fixedSlots: env.AVAILABLE_TIME_SLOTS.split(",")
       .map((slot) => slot.trim())
       .filter((slot) => slot.length > 0),

@@ -361,3 +361,34 @@ be undone, such as a Docker migration risking another project's data.
 
 **Prevention rule.** Ask only when being wrong would be expensive *and*
 irreversible. Otherwise decide, say what you decided and why, and move.
+
+---
+
+## Test isolation set at module scope, silently undone by the test runner
+
+**What happened.** Adding Google Calendar meant the booking code reads a real
+calendar. `tests/setup.ts` cleared `GOOGLE_CLIENT_EMAIL`, `GOOGLE_PRIVATE_KEY`
+and `GOOGLE_CALENDAR_ID` at module scope so the suite would stay offline. It
+did not work. Vitest loads `.env` through Vite *after* setup modules are
+evaluated, so the real service account was back in `process.env` before the
+first test ran. The whole suite made live Calendar API calls against the
+business's actual calendar, and its 19 real events filtered offered slots down
+to zero.
+
+**Root cause.** The symptom pointed somewhere else entirely. Three specs failed
+on availability, which reads as a bug in slot resolution — and I spent four
+rounds theorising about `resolveOccurrences`, timezones and the unique
+constraint before instrumenting anything. The probe that finally found it
+printed one line: `calendarConfigured: true`.
+
+**The correct fix.** Move the isolation into `beforeEach`, which runs after any
+env loading, and set empty strings rather than `delete` — empty is what
+`env.ts` treats as unset and it survives a reload that a delete does not. Then
+`tests/calendar/network-isolation.test.ts` asserts the isolation itself, because
+a suite that reaches the network still passes right up until the network or the
+calendar's contents change.
+
+**Prevention rule.** Isolation from an external system is a claim to be
+asserted, not arranged and assumed. Write the test that proves the tests cannot
+reach it. And when a failure looks like domain logic, print the actual state
+before theorising about the algorithm — measurement first, hypothesis second.

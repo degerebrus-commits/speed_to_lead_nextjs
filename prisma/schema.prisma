@@ -43,6 +43,20 @@ model Lead {
 
   status LeadStatus @default(NEW)
 
+  /// Slot keys in the numbered list this lead was last shown, in the order
+  /// they were shown.
+  ///
+  /// Persisted because the numbering has to survive between the offer and the
+  /// reply. Recomputing availability when "2" arrives is not the same list: if
+  /// anything was booked in between, every number below it shifts, and the
+  /// customer is booked into a time they did not pick.
+  offeredSlotKeys String[] @default([])
+
+  /// Slot keys this lead has explicitly turned down, accumulated across
+  /// rounds. Excluded from every later offer, so "none of those work" produces
+  /// genuinely different times rather than the same three again.
+  declinedSlotKeys String[] @default([])
+
   /// sha256(normalisedPhone + ':' + trimmedMessage). Unique so that a retried
   /// webhook delivery collides at the database rather than racing a SELECT
   /// that would let both writers through.
@@ -159,6 +173,15 @@ model Appointment {
   slotKey String @unique
 
   confirmationSentAt DateTime?
+
+  /// The Google Calendar event this appointment was written to.
+  ///
+  /// Null means it was never written: no credentials configured, no resolvable
+  /// time, or the API call failed. The booking is still valid either way - the
+  /// database is the record and the calendar is a copy for the business - so
+  /// this column doubles as the work queue for backfilling the ones that
+  /// failed.
+  calendarEventId String?
   createdAt          DateTime  @default(now())
   updatedAt          DateTime  @updatedAt
 
