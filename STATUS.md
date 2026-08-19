@@ -59,27 +59,36 @@ not pass without the consent line live on the client's form. This is the
 critical path to going live — see `CLIENT-REQUIREMENTS.md`, which is written
 for the client to read directly.
 
-**The Redmi handset now fails in both directions, and TextBee is not a
-production path.**
+**TextBee delivers, but late - and inbound is never captured.**
 
-Inbound was never captured - `receivedSMSCount` never increments - and on
-2026-08-18 outbound stopped too: three messages were dispatched by TextBee at
-11:56 and **none arrived on the phone**, despite a real text landing
-successfully the day before. TextBee does not send SMS itself; it queues to the
-app on the handset, so "dispatched" only means the device accepted the job.
-Suspect MIUI battery optimisation killing the app, lost SMS permission, or the
-device being offline.
+Corrected 2026-08-19. Yesterday this file said three messages dispatched at
+11:56 never arrived; they did arrive, substantially delayed. The distinction
+matters: the gateway is not broken, it is slow, and the likely cause is MIUI
+battery optimisation deferring the app's background work so messages queue on
+the handset and flush when Android next lets it run. Untested fix: Settings ->
+Apps -> TextBee -> Battery saver -> No restrictions, plus Autostart.
 
-Neither is a code problem - every line past the signature check cannot tell a
+**Latency is the open question and it decides the gateway.** The product's
+whole promise is a reply within seconds. Seconds is fine; ten minutes makes a
+live demo unwinnable. Nobody has measured it yet - send one message, timestamp
+it, and time the arrival before choosing.
+
+**Inbound was never captured at all** - `receivedSMSCount` never increments,
+even for a text from a different number. That part is unambiguous.
+
+Neither is a code problem: every line past the signature check cannot tell a
 signed POST from a real delivery, and the full booking flow was proven that way
-on 2026-08-18: lead captured with consent, slots offered, `Mon-Fri 2pm` booked,
+on 2026-08-18 - lead captured with consent, slots offered, `Mon-Fri 2pm` booked,
 appointment stored, dashboard updated.
 
-**The conclusion is about the approach, not the device.** A system whose promise
-is replying within five minutes cannot depend on a phone staying awake with an
-app alive. `Checklist.md` specified Twilio from the start; this is the evidence
-for it. Until then keep `SMS_PROVIDER=console`, which logs instead of sending
-and costs nothing.
+**SMS Gate (capcom6/android-sms-gateway) is built and ready as an alternative**
+but has never sent a message. It reports real per-message delivery state, which
+is what would have answered the question above in seconds rather than a day.
+Same category as TextBee though - a handset relay, so it cannot be A2P
+registered either.
+
+Keep `SMS_PROVIDER=console` until a gateway is chosen; it logs instead of
+sending and costs nothing.
 
 **The OpenAI account has no credit.** `AI_PROVIDER=openai` fails with
 `insufficient_quota`; `anthropic` works.
