@@ -1,12 +1,12 @@
 # Project Status
 
-Snapshot as of **2026-08-18**. Read with `CONTRIBUTING.md` (conventions and the
+Snapshot as of **2026-08-19**. Read with `CONTRIBUTING.md` (conventions and the
 single-tenant decision), `PRD-TRACEABILITY.md` (every requirement, built or
 not), `SPEC-COMPARISON.md` (how this differs from the Express build),
 `MISTAKES.md` (what went wrong and the rules that prevent it), and
 `STANDARDS.md`.
 
-**218 tests passing**, typecheck clean, production build succeeds, CI runs on
+**251 tests passing**, typecheck clean, production build succeeds, CI runs on
 every push.
 
 ---
@@ -59,36 +59,30 @@ not pass without the consent line live on the client's form. This is the
 critical path to going live — see `CLIENT-REQUIREMENTS.md`, which is written
 for the client to read directly.
 
-**TextBee delivers, but late - and inbound is never captured.**
+**The handset gateways do not work. Use Twilio.**
 
-Corrected 2026-08-19. Yesterday this file said three messages dispatched at
-11:56 never arrived; they did arrive, substantially delayed. The distinction
-matters: the gateway is not broken, it is slow, and the likely cause is MIUI
-battery optimisation deferring the app's background work so messages queue on
-the handset and flush when Android next lets it run. Untested fix: Settings ->
-Apps -> TextBee -> Battery saver -> No restrictions, plus Autostart.
+Settled 2026-08-19 after two clean tests. TextBee accepts a message, returns a
+real provider id in about two seconds, and the phone never delivers it -
+yesterday three messages arrived hours late, today one never arrived at all.
+Inbound has never once been captured, in either direction of testing.
 
-**Latency is the open question and it decides the gateway.** The product's
-whole promise is a reply within seconds. Seconds is fine; ten minutes makes a
-live demo unwinnable. Nobody has measured it yet - send one message, timestamp
-it, and time the arrival before choosing.
+That is not a code problem. Every line past the signature check cannot tell a
+signed POST from a real delivery, and the full booking flow was proven that way:
+lead captured with consent, slots offered, a slot booked, appointment stored,
+dashboard updated.
 
-**Inbound was never captured at all** - `receivedSMSCount` never increments,
-even for a text from a different number. That part is unambiguous.
+**Neither handset relay can ever go live regardless.** A personal SIM cannot be
+registered for A2P 10DLC, and US carriers filter unregistered automated
+business traffic. TextBee and SMS Gate were only ever development tools.
 
-Neither is a code problem: every line past the signature check cannot tell a
-signed POST from a real delivery, and the full booking flow was proven that way
-on 2026-08-18 - lead captured with consent, slots offered, `Mon-Fri 2pm` booked,
-appointment stored, dashboard updated.
+**The Twilio provider is built and tested** - outbound through the REST API, and
+an inbound webhook verified against X-Twilio-Signature, which signs the request
+URL as well as the parameters. It needs an account: TWILIO_ACCOUNT_SID,
+TWILIO_AUTH_TOKEN, TWILIO_FROM_NUMBER and TWILIO_WEBHOOK_URL. A trial account
+is enough to demo - it only delivers to numbers verified in the console and
+prefixes a trial notice, both of which disappear on upgrade.
 
-**SMS Gate (capcom6/android-sms-gateway) is built and ready as an alternative**
-but has never sent a message. It reports real per-message delivery state, which
-is what would have answered the question above in seconds rather than a day.
-Same category as TextBee though - a handset relay, so it cannot be A2P
-registered either.
-
-Keep `SMS_PROVIDER=console` until a gateway is chosen; it logs instead of
-sending and costs nothing.
+Keep SMS_PROVIDER=console until those credentials exist.
 
 **The OpenAI account has no credit.** `AI_PROVIDER=openai` fails with
 `insufficient_quota`; `anthropic` works.
@@ -131,6 +125,35 @@ problem on this machine today, but it is a suspicion, not a finding.
 **Do not treat the container as working until it has been run somewhere with
 real memory.** Railway is the natural place to find out - and if it wedges
 there too, this is a genuine defect rather than the machine.
+
+### Done on 2026-08-19
+
+- **Twilio provider and signed inbound webhook.** The only gateway that can
+  carry a real deployment. Needs an account before it can be tested.
+- **National trunk prefixes.** "0953 430 5571" is how a Filipino writes their
+  mobile; the normaliser prepended +63 without dropping the zero, producing a
+  13-digit number that does not exist, and nothing reported it as wrong.
+  Invisible while +1 was the only configured country, because the US has no
+  trunk prefix. It also broke deduplication: the same customer entering
+  "0953..." and "953..." became two leads.
+- **Echo guard.** A handset registered as the gateway reports its own outbound
+  texts as received, so the assistant answered itself. An inbound message
+  matching something sent to that number within ten minutes is stored but never
+  answered, and cannot opt anyone out - the booking confirmation ends "Reply
+  STOP to opt out", which classified as a keyword would unsubscribe the
+  customer from their own confirmation.
+- **Empty optional config.** .env.example ships optional keys as KEY="", and
+  dotenv hands those through as empty strings, so .url() and .min(1) rejected
+  them exactly as a wrong value. Anyone copying the example verbatim could not
+  start the app. A test now reads the real .env.example and asserts it starts.
+- **Philippines configuration** for testing: +63, Asia/Manila, Metro Manila
+  service area. Previous US settings saved to .env.backup-before-ph.
+
+**The demo form has three real bugs**, recorded in DEMO-FORM-PROMPT.md for the
+next regeneration: the consent control needs two clicks to register, gives no
+visible state change when it does, and a failed submit leaves its error on
+screen until refresh. All three read to the user as "the submit button is
+broken".
 
 ### Done since this file was last written
 
