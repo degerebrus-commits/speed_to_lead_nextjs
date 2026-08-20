@@ -643,27 +643,63 @@ All business data must be isolated by organization.
 
 ---
 
-# 25. Multi-Tenancy
+# 25. Single Tenancy
 
-The product should be designed as a multi-tenant SaaS application.
+**Corrected 2026-08-20.** This section previously specified a multi-tenant SaaS
+application. That is not what is being built, and the contradiction was
+resurfacing in every working session.
 
-Every organization should have isolated:
+The product is **single-tenant**: one deployment per HVAC company, customized
+for that company. Not a SaaS platform.
 
-- Leads
-- Conversations
-- Messages
-- AI settings
-- Appointments
-- Calendar integrations
-- Users
-- Analytics
-- Business configuration
+## What that means
 
-A user from Organization A must never be able to access Organization B's data.
+There is no `Organization` model, no `organizationId` column, and no
+tenant-scoped query layer. Isolation between businesses is achieved by them not
+sharing a deployment: separate application instance, separate database,
+separate Google Calendar credentials, separate SMS sender.
 
-Enforce tenant isolation server-side.
+The requirement that "a user from Organization A must never access
+Organization B's data" is satisfied absolutely rather than by enforcement code
+— there is no Organization B in the process, the database, or the schema.
 
-Do not rely solely on frontend filtering.
+## Per-client customization
+
+`src/config/business.ts` is the seam. Business name, timezone, country code,
+service area, hours, message templates and booking slots are read from
+configuration rather than hardcoded. Swapping that configuration and redeploying
+is how one client becomes the next, and it is also the seam for adapting to a
+service vertical other than HVAC.
+
+Client-specific secrets — Google service account, SMS provider credentials,
+webhook secrets — live in that deployment's `.env` and belong to that client.
+
+## Why this, and what it costs
+
+A single-tenant deployment removes an entire category of the most damaging bug
+this product could have: one business seeing another's customers. It also
+removes the need for authentication to carry tenant identity, which is why the
+dashboard has a single shared login rather than user accounts.
+
+The cost is operational. Ten clients means ten deployments, ten databases and
+ten sets of credentials to rotate. That is a deliberate trade: at the scale this
+product is sold, per-client operations are cheaper than the engineering and the
+risk of getting tenant isolation wrong.
+
+## If multi-tenancy is ever required
+
+It is a rewrite of the data layer, not a feature toggle. Every query would need
+tenant scoping, authentication would need to carry tenant identity, and every
+existing row would need backfilling into an organization. Deciding to build a
+SaaS platform is a decision to start that work deliberately — not something to
+be arrived at by adding a column.
+
+## Related contradictions still outstanding
+
+Section 26 (Roles & Permissions) specifies OWNER / ADMIN / STAFF roles, which
+this build also does not have, for the same reason: there is one business and
+one login. `STANDARDS.md` §13, §14, §15 and §57.3 carry the same multi-tenant
+assumption and have not been amended.
 
 ---
 
