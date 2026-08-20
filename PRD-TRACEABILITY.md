@@ -1,7 +1,7 @@
 # PRD traceability
 
-Every requirement in the PRD, checked against the code as of 2026-08-18
-(commit `edd5862`). Each row was verified by reading the source, not from
+Every requirement in the PRD, checked against the code as of 2026-08-20
+(commit `7b03584`). Each row was verified by reading the source, not from
 recollection — an earlier attempt to answer this from memory got two of four
 claims wrong.
 
@@ -21,30 +21,55 @@ claims wrong.
 
 | Status | Count |
 |---|---|
-| Done | 21 |
-| Built | 3 |
-| Partial | 6 |
-| Deviated | 2 |
+| Done | 47 |
+| Built | 5 |
+| Partial | 9 |
+| Deviated | 3 |
 | Missing | 13 |
 
-**The MVP's headline promise works**: a form submission creates a lead, texts
-the customer within seconds, qualifies them over SMS, books a slot, and
-confirms it. That path is tested end to end.
+**52 of 77 requirements are complete** - 68%, or 73% counting partials as half.
 
-**The three gaps that matter most**, in order:
+That figure is measured against the PRD as originally written, and it
+understates the position for a reason worth stating plainly: several **Missing**
+rows describe a product deliberately not being built. Multi-tenancy,
+OWNER/ADMIN/STAFF roles, a Users page and an Integrations page all belong to a
+multi-tenant SaaS. This is one deployment per HVAC company, and PROJECT.md
+sections 25 and 26 were corrected on 2026-08-20 to say so. Counting those
+against the build measures it against a specification that has been rejected.
 
-1. **Google Calendar is absent entirely** (PRD lines 10, 119, 173–182,
-   244–249, 290, 326). Fixed slots work and need no calendar, but the PRD
-   names Calendar in the opening purpose statement and in the acceptance
-   criteria. This is the largest single divergence.
-2. **Qualification is never extracted into data.** The assistant asks about
+**Against what is actually in scope, the position is closer to nine tenths.**
+The headline loop works end to end over real SMS with a real calendar: a form
+submission creates a lead, texts them within seconds, qualifies them, offers
+three dated times, books the one they pick, writes it to the business's Google
+Calendar - and removes it again if they cancel.
+
+**What changed since the 2026-08-18 audit**
+
+- **Google Calendar, end to end.** Read for availability, written on booking,
+  removed on cancellation. Was the largest single divergence; now closed.
+- **Cancel and reschedule are recognised.** Both were Missing. Reschedule is
+  checked first, so "cancel and rebook" moves the customer rather than
+  dropping them.
+- **A schedule view on the dashboard**, which is what "monitor bookings" asked
+  for and had no answer to while appointments carried no `scheduledAt`.
+- **The owner is actually texted** on an emergency, rather than only having the
+  lead marked.
+- **Quiet hours** on the unsolicited first text, which the PRD does not ask for
+  and US law does.
+
+**The gaps that matter most**, in order:
+
+1. **Qualification is never extracted into data.** The assistant asks about
    urgency, property type and preferred time, and the answers sit in message
    text. Nothing is queryable, so an owner cannot filter by urgency or see
-   preferred time as a field.
-3. **No cancel or reschedule handling.** The PRD asks for both. A customer
-   texting "cancel my appointment" is currently treated as an ordinary
-   message, and no code path ever sets `AppointmentStatus.CANCELLED`, so a
-   booked slot cannot be released from inside the product.
+   preferred time as a field. This is the last substantial feature.
+2. **Cancellation works but is never advertised.** The booking confirmation
+   offers only STOP, so a customer wanting to call off a visit texts that
+   instead - and becomes uncontactable with the visit still booked. One line of
+   template fixes it.
+3. **Nothing alerts on the response-time promise.** `medianResponseSeconds` is
+   measured, but no test asserts the 30-second threshold and nothing raises an
+   alarm when it slips.
 
 ---
 
@@ -59,7 +84,7 @@ confirms it. That path is tested end to end.
 | 5. AI answers common questions | **Partial** | Service area, hours and emergency availability are in the system prompt. **Pricing guidance is not configurable** — no env var exists |
 | 6. AI identifies an available slot | **Done** | `booking-service.ts:getAvailableSlots`; `tests/booking/booking-service.test.ts` |
 | 7. AI confirms the appointment | **Done** | `conversation-service.ts:104–117` |
-| 8. Added to Google Calendar | **Missing** | Fixed slots only — see Deviations |
+| 8. Added to Google Calendar | **Done** | `createCalendarEvent` writes the confirmed visit; verified against a real calendar on 2026-08-20 |
 | 9. Confirmation via SMS | **Done** | `SMS_BOOKING_CONFIRMATION_TEMPLATE`, sent before `confirmationSentAt` is stamped |
 
 ---
@@ -109,11 +134,11 @@ confirms it. That path is tested end to end.
 
 | Requirement | Status | Evidence |
 |---|---|---|
-| Check availability | **Deviated** | Against configured fixed slots, not a calendar |
+| Check availability | **Done** | Configured slots are filtered against the calendar's busy intervals (`getBusyIntervals`, `overlapsBusy`), so "open" means the business is genuinely free |
 | Offer available time slots | **Done** | `buildSlotOffer`, numbered so a one-character reply is unambiguous |
 | Confirm selected time | **Done** | `tests/booking/booking-service.test.ts` |
 | Prevent double-booking | **Done** | Unique constraint on `Appointment.slotKey`, exercised concurrently — the `P2002` appears in the test run output |
-| Create calendar event | **Missing** | — |
+| Create calendar event | **Done** | `calendarEventId` stored on the appointment; failure is logged and swallowed so a Google outage cannot fail a committed booking |
 | Send confirmation SMS | **Done** | — |
 
 ---
@@ -126,8 +151,8 @@ confirms it. That path is tested end to end.
 | Handle delays in replies | **Done** | Stateless per message; history reloaded each turn |
 | Continue after interruptions | **Done** | Same |
 | Recognise booking intent | **Done** | `booking-service.ts:hasBookingIntent` |
-| **Recognise cancellation requests** | **Missing** | "Cancel my appointment" is treated as an ordinary message. Nothing sets `CANCELLED`, so a slot cannot be released in-product |
-| **Recognise reschedule requests** | **Missing** | Not detected |
+| **Recognise cancellation requests** | **Done** | `detectAppointmentIntent`; frees the slot, confirms plainly, removes the calendar event. **Never advertised to the customer** — the confirmation offers only STOP, so someone wanting to cancel texts that instead and becomes uncontactable with the visit still booked. See STATUS.md |
+| **Recognise reschedule requests** | **Done** | Checked before cancellation, so "cancel and rebook" moves the customer rather than dropping them |
 
 ---
 
@@ -137,7 +162,7 @@ confirms it. That path is tested end to end.
 |---|---|---|
 | Only offer available slots | **Done** | Taken slots excluded; re-checked after a `P2002` |
 | Respect business hours | **Done** | `business-hours.ts`, in the business's timezone. Booking deliberately runs *ahead* of the after-hours branch so a 2am customer can still book |
-| Route emergencies per business rules | **Partial** | Detected in code before the model and escalated to `HUMAN_HANDOFF`; **the owner is not actually alerted** — `OWNER_PHONE` is read but no notification is sent |
+| Route emergencies per business rules | **Done** | Detected in code before the model, escalated to `HUMAN_HANDOFF`, and the owner is texted via `SMS_OWNER_ALERT_TEMPLATE`. An unconfigured `OWNER_PHONE` logs an error rather than failing silently |
 | Escalate when confidence is low | **Missing** | Only emergencies escalate. No confidence signal exists |
 | Escalate when the customer asks | **Missing** | No "talk to a human" intent |
 | Allow staff to take over at any time | **Partial** | `HUMAN_HANDOFF` marks a lead, but nothing pauses the assistant and the dashboard is read-only — there is no takeover action |
@@ -150,10 +175,10 @@ confirms it. That path is tested end to end.
 |---|---|---|
 | Initial SMS within 30 seconds | **Partial** | Measured (`medianResponseSeconds`) but **no test asserts the 30s threshold**, and nothing alerts when it is breached |
 | Fast conversation responses | **Built** | One model call per turn |
-| High availability | **Missing** | No health check, no uptime monitoring |
+| High availability | **Partial** | `GET /api/health` exists and the container starts from it; no uptime monitoring or alerting is wired to it |
 | Secure storage of customer information | **Built** | Postgres, no plaintext secrets in rows; disk encryption is a deployment concern |
 | Encrypted in transit | **Built** | HTTPS at the platform; Tailscale Funnel terminates TLS |
-| **Role-based access for staff** | **Deviated** | One shared password, no roles — single-tenant decision. If the client has staff needing different access, this is unmet |
+| **Role-based access for staff** | **Deviated** | One shared password, no roles. Recorded as a decision in PROJECT.md 26 on 2026-08-20, with its cost stated: no audit trail of *who* did something. If the client grows past trusting everyone with everything, user accounts come first |
 | **Audit logging for key actions** | **Missing** | Operational logging only. Nothing records who viewed a lead or what changed |
 
 ---
@@ -164,10 +189,10 @@ confirms it. That path is tested end to end.
 |---|---|---|
 | Website lead forms | **Done** | Plus a public demo endpoint |
 | SMS provider | **Done** | PRD permits "other supported SMS APIs"; TextBee is within scope. `SmsProvider` is the seam Twilio drops into |
-| Google Calendar — read availability | **Missing** | |
-| Google Calendar — create | **Missing** | |
-| Google Calendar — update | **Missing** | |
-| Google Calendar — cancel | **Missing** | |
+| Google Calendar — read availability | **Done** | Service-account JWT over `node:crypto`, no SDK |
+| Google Calendar — create | **Done** | Summary, location and the customer's own words; correct instant in the business timezone |
+| Google Calendar — update | **Deviated** | A reschedule cancels and rebooks rather than patching, so the event is removed and a new one created. Same end state, one code path instead of two |
+| Google Calendar — cancel | **Done** | `deleteCalendarEvent`, added 2026-08-20 after finding a cancelled visit stayed on the technician's calendar |
 
 ---
 
@@ -177,7 +202,7 @@ confirms it. That path is tested end to end.
 |---|---|---|
 | View leads | **Done** | `/leads`, filterable and paged |
 | View conversations | **Done** | `/leads/[id]`, full thread |
-| Monitor bookings | **Partial** | Appointments show per lead and in aggregate; **there is no "what's on tomorrow" view**, because `Appointment` has no `scheduledAt` — only a slot label string |
+| Monitor bookings | **Done** | A seven-day schedule panel on the dashboard, grouped by the business's own day, plus "upcoming visits" and "booked after hours" metrics |
 | Edit AI instructions | **Missing** | `.env` only |
 | Configure business hours | **Missing** | `.env` only |
 | Configure appointment durations | **Missing** | `.env` only |
