@@ -1,7 +1,8 @@
 import Link from "next/link";
 
-import { formatDateParts, formatDateTime, formatDuration } from "@/lib/format";
+import { formatDateParts, formatDateTime, formatDuration, formatTime } from "@/lib/format";
 import { getDashboardMetrics, getStalledLeads } from "@/server/analytics/metrics-service";
+import { getSchedule } from "@/server/booking/schedule-queries";
 import { requireSession } from "@/server/auth/require-session";
 
 // Metrics reflect leads arriving continuously; a cached page would show an
@@ -29,10 +30,13 @@ function Metric({
 export default async function DashboardPage() {
   await requireSession();
 
-  const [metrics, stalled] = await Promise.all([
+  const [metrics, stalled, schedule] = await Promise.all([
     getDashboardMetrics(),
     getStalledLeads(),
+    getSchedule(),
   ]);
+
+  const scheduleTotal = schedule.reduce((sum, day) => sum + day.visits.length, 0);
 
   const hasAnyLeads = metrics.leadsReceived > 0 || stalled.length > 0;
 
@@ -88,7 +92,7 @@ export default async function DashboardPage() {
             <Metric
               label="Appointments booked"
               value={String(metrics.appointmentsBooked)}
-              note={`${metrics.afterHoursBookings} outside business hours`}
+              note="In this window"
             />
             <Metric
               label="Booking rate"
@@ -132,6 +136,46 @@ export default async function DashboardPage() {
                   : `Next ${formatDateTime(metrics.nextVisitAt)}`
               }
             />
+          </div>
+
+          <h2>Schedule</h2>
+          <p className="subtitle">
+            {scheduleTotal === 0
+              ? "Nothing booked in the next seven days."
+              : `${scheduleTotal} visit${scheduleTotal === 1 ? "" : "s"} over the next seven days.`}
+          </p>
+
+          <div className="schedule-grid">
+            {schedule.map((day) => (
+              <div key={day.key} className="schedule-day">
+                <p className={day.isToday ? "schedule-date is-today" : "schedule-date"}>
+                  {day.weekday} {day.dayOfMonth}
+                </p>
+
+                {day.visits.length === 0 ? (
+                  <p className="schedule-none">—</p>
+                ) : (
+                  day.visits.map((visit) => (
+                    <Link
+                      key={visit.appointmentId}
+                      href={`/leads/${visit.leadId}`}
+                      className={visit.optedOut ? "visit visit-flagged" : "visit"}
+                      // The card carries a time and a first name; a screen
+                      // reader gets the whole appointment.
+                      aria-label={`${formatTime(visit.scheduledAt)}, ${visit.name}, ${visit.serviceAddress}${
+                        visit.optedOut ? ", opted out of texts" : ""
+                      }`}
+                    >
+                      <span className="visit-time">{formatTime(visit.scheduledAt)}</span>
+                      <span className="visit-name">{visit.name}</span>
+                      {visit.optedOut ? (
+                        <span className="visit-flag">Opted out</span>
+                      ) : null}
+                    </Link>
+                  ))
+                )}
+              </div>
+            ))}
           </div>
 
           {stalled.length > 0 ? (

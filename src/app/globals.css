@@ -433,3 +433,109 @@ tbody tr:last-child td {
   color: var(--text-muted);
   font-size: 13px;
 }
+
+/*
+ * The week's visits, one column per day.
+ *
+ * Days with nothing booked are still rendered, so the columns line up with the
+ * calendar an owner has in their head. Collapsing empty days would put Friday
+ * next to Monday and read as a full week.
+ */
+.schedule-grid {
+  display: grid;
+  grid-template-columns: repeat(7, minmax(0, 1fr));
+  gap: 8px;
+  margin-bottom: 32px;
+}
+
+.schedule-day {
+  min-width: 0;
+}
+
+.schedule-date {
+  margin: 0 0 8px;
+  font-size: 13px;
+  color: var(--text-muted);
+}
+
+.schedule-date.is-today {
+  color: var(--text);
+  font-weight: 600;
+}
+
+.schedule-none {
+  margin: 0;
+  padding: 8px 2px;
+  color: var(--text-muted);
+}
+
+.visit {
+  display: block;
+  margin-bottom: 6px;
+  padding: 8px 10px;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  text-decoration: none;
+  color: var(--text);
+}
+
+.visit:hover {
+  border-color: var(--accent);
+}
+
+/*
+ * The customer texted STOP. The visit still stands and the assistant can no
+ * longer reach them, so this is the one card that needs a person to call.
+ */
+.visit-flagged {
+  background: var(--warn-soft);
+  border-color: var(--warn);
+}
+
+.visit-time {
+  display: block;
+  font-size: 14px;
+  font-weight: 600;
+}
+
+.visit-name {
+  display: block;
+  font-size: 13px;
+  color: var(--text-muted);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.visit-flag {
+  display: block;
+  margin-top: 4px;
+  font-size: 12px;
+  color: var(--warn);
+}
+
+/* Seven columns stop being readable long before a phone; stack them. */
+@media (max-width: 900px) {
+  .schedule-grid {
+    grid-template-columns: 1fr;
+    gap: 4px;
+  }
+
+  .schedule-day {
+    display: flex;
+    align-items: baseline;
+    gap: 12px;
+    padding: 6px 0;
+    border-bottom: 1px solid var(--border);
+  }
+
+  .schedule-date {
+    flex: 0 0 68px;
+    margin: 0;
+  }
+
+  .visit {
+    margin-bottom: 4px;
+  }
+}
