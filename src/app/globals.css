@@ -416,3 +416,20 @@ tbody tr:last-child td {
     animation: none;
   }
 }
+
+/*
+ * A timestamp in a table column, on two lines.
+ *
+ * One string wraps wherever the column width runs out - after the year on one
+ * row, mid-time on the next - and a column whose break moves cannot be
+ * scanned. The date holds its own line, the time sits beneath it quieter.
+ */
+.stamp {
+  white-space: nowrap;
+}
+
+.stamp-time {
+  display: block;
+  color: var(--text-muted);
+  font-size: 13px;
+}

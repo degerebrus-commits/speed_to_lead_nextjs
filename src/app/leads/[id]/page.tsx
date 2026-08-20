@@ -1,7 +1,13 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
 
-import { formatDateTime, formatLeadStatus, formatTime, leadStatusTone } from "@/lib/format";
+import {
+  formatDateParts,
+  formatDateTime,
+  formatLeadStatus,
+  formatTime,
+  leadStatusTone,
+} from "@/lib/format";
 import { requireSession } from "@/server/auth/require-session";
 import { getLeadDetail } from "@/server/leads/lead-queries";
 
@@ -130,7 +136,10 @@ export default async function LeadDetailPage({
                         appointment.status.slice(1).toLowerCase()}
                     </span>
                   </td>
-                  <td>{formatDateTime(appointment.createdAt)}</td>
+                  <td className="stamp">
+                      {formatDateParts(appointment.createdAt).date}
+                      <span className="stamp-time">{formatDateParts(appointment.createdAt).time}</span>
+                    </td>
                 </tr>
               ))}
             </tbody>

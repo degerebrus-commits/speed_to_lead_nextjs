@@ -46,6 +46,27 @@ export function formatTime(value: Date): string {
   }).format(value);
 }
 
+/**
+ * The same instant split into its two lines, for table cells.
+ *
+ * `formatDateTime` returns one string, which in a narrow column wraps wherever
+ * the width happens to run out - after the year on one row, mid-time on the
+ * next. The eye cannot scan a column whose break moves. Splitting it puts the
+ * date on top and the time beneath on every row, at the cost of the caller
+ * rendering two elements instead of one.
+ *
+ * Prose keeps `formatDateTime`: "They replied STOP on Aug 20, 2026, 10:05 AM"
+ * is a sentence, not a column.
+ */
+export function formatDateParts(value: Date): { date: string; time: string } {
+  const timeZone = getBusinessProfile().timezone;
+
+  return {
+    date: new Intl.DateTimeFormat("en-US", { timeZone, dateStyle: "medium" }).format(value),
+    time: new Intl.DateTimeFormat("en-US", { timeZone, timeStyle: "short" }).format(value),
+  };
+}
+
 /** Status labels in sentence case; the enum's SCREAMING_SNAKE is not for humans. */
 const STATUS_LABELS: Record<LeadStatus, string> = {
   NEW: "New",

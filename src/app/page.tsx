@@ -1,6 +1,6 @@
 import Link from "next/link";
 
-import { formatDateTime, formatDuration } from "@/lib/format";
+import { formatDateParts, formatDateTime, formatDuration } from "@/lib/format";
 import { getDashboardMetrics, getStalledLeads } from "@/server/analytics/metrics-service";
 import { requireSession } from "@/server/auth/require-session";
 
@@ -136,7 +136,10 @@ export default async function DashboardPage() {
                           <Link href={`/leads/${lead.id}`}>{lead.name}</Link>
                         </td>
                         <td>{lead.phone}</td>
-                        <td>{formatDateTime(lead.createdAt)}</td>
+                        <td className="stamp">
+                      {formatDateParts(lead.createdAt).date}
+                      <span className="stamp-time">{formatDateParts(lead.createdAt).time}</span>
+                    </td>
                         <td>{formatDuration(lead.waitingSeconds)}</td>
                       </tr>
                     ))}

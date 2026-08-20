@@ -3,7 +3,7 @@ import Link from "next/link";
 
 import {
   LEAD_STATUS_ORDER,
-  formatDateTime,
+  formatDateParts,
   formatLeadStatus,
   leadStatusTone,
 } from "@/lib/format";
@@ -133,7 +133,10 @@ export default async function LeadsPage({
                       ) : null}
                     </td>
                     <td>{preview(lead.lastMessageBody)}</td>
-                    <td>{formatDateTime(lead.createdAt)}</td>
+                    <td className="stamp">
+                      {formatDateParts(lead.createdAt).date}
+                      <span className="stamp-time">{formatDateParts(lead.createdAt).time}</span>
+                    </td>
                   </tr>
                 ))}
               </tbody>
