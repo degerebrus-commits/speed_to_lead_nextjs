@@ -75,7 +75,29 @@ dashboard updated.
 registered for A2P 10DLC, and US carriers filter unregistered automated
 business traffic. TextBee and SMS Gate were only ever development tools.
 
-**Measured 2026-08-19: 24 minutes from dispatch to arrival.** The fourth
+**SOLVED 2026-08-20 with SMS Gate in Local Server mode.** The phone runs an
+HTTP server on the LAN; there is no push notification, so there is nothing for
+a battery manager to suppress. Outbound went from 24 minutes to under five
+seconds, and the gateway reports real per-recipient state (`Sent`) instead of
+TextBee's meaningless "dispatched".
+
+Full loop proven over real SMS, both directions, on Philippine settings:
+
+    02:05:36  ->  intro sent                          (<5s to the handset)
+    02:13:23  <-  "Book me in"
+    02:13:24  ->  1) Thu Aug 20, 11am  2) 2pm  3) 4pm  (1 second)
+    02:13:58  <-  "1"
+    02:13:59  ->  confirmed, and written to Google Calendar
+
+Configuration: SMS_PROVIDER=sms-gate, SMS_GATE_URL=http://<phone-lan-ip>:8080.
+The device IP changes between sessions - re-read it from the app. The inbound
+webhook is registered on the device itself, not in a dashboard, and the
+TextBee subscription is disabled (isActive=false) so nothing double-delivers.
+
+Still a test rig: a consumer SIM can never be A2P registered, so a paying US
+client still needs Twilio under their own business.
+
+**Historical - the measurement that settled TextBee, 2026-08-19: 24 minutes.** The fourth
 message with the same signature, against a 30-minute device heartbeat. Not
 variance - a mechanism.
 
@@ -375,3 +397,38 @@ suite is free.
 - **Consent gates sending, not storing.** A lead without a consent tick is saved and flagged on the dashboard; the text is held. Losing a customer over a missing checkbox would be worse than not texting them.
 - **A digit only counts as a slot choice after slots were offered.** Reading every number as a selection booked appointments for customers describing their problem.
 - **Failure isolation.** A lead is stored even when the SMS or AI call fails, and the webhook still returns 2xx so the gateway stops retrying something already stored.
+
+---
+
+## Left in the database on 2026-08-20, clear before demoing
+
+Two leads carry **fabricated intake data** - names and addresses typed by
+Claude to drive a test, not real submissions:
+
+- Ramon Cruz, +639534305571, "7 Aurora Blvd, Quezon City"
+- Maria Santos, +639171234567, "42 Katipunan Ave, Quezon City"
+
+Their conversations and bookings are genuine; the intake details are not.
+Three appointments exist across them, two of which are duplicates on
+Thu 20 Aug (11am and 4pm) from booking twice during the test, and all are on
+the real Google Calendar.
+
++639534305571 is **opted out** - STOP was sent during testing. Texting it again
+requires START from that handset first.
+
+## Decided but not built: quiet hours
+
+`sendIntroSms` checks opt-out, consent and quota, and nothing about the time of
+day. A lead submitted at 3am is texted at 3am. `isWithinBusinessHours` exists
+but only selects wording; it never suppresses a send.
+
+US law restricts marketing texts to 8am-9pm in the recipient's local time, with
+statutory damages per message, and the client would be the registered sender.
+
+The tension is real: holding a 11pm lead until morning loses the night-time
+advantage the product is sold on. The shape that resolves it is to let *replies*
+go out at any hour - someone texting at 2am is awake and expecting an answer -
+while the unsolicited first contact waits for the window. `introSmsSentAt` is
+already the queue of leads owed a first message, so the mechanism is half built.
+
+Needs a policy decision before a client goes live.
