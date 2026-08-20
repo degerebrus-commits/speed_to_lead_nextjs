@@ -29,6 +29,56 @@ export function isCalendarConfigured(): boolean {
   return Boolean(env.GOOGLE_CLIENT_EMAIL && env.GOOGLE_PRIVATE_KEY && env.GOOGLE_CALENDAR_ID);
 }
 
+/**
+ * Removes a cancelled appointment's event from the calendar.
+ *
+ * Never throws. The cancellation is already committed and the customer already
+ * told; a calendar failure must not reopen a visit they have called off.
+ *
+ * Returns true when the calendar no longer holds the event - including when it
+ * was already gone. Google answers 410 for an event deleted twice and 404 for
+ * one that never existed, and both mean the same thing here: nothing is left on
+ * anyone's calendar, which is the outcome being asked for.
+ */
+export async function deleteCalendarEvent(eventId: string): Promise<boolean> {
+  if (!isCalendarConfigured()) return false;
+
+  const calendarId = getEnv().GOOGLE_CALENDAR_ID as string;
+
+  try {
+    const token = await getGoogleAccessToken();
+
+    const response = await fetch(
+      `${CALENDAR_API}/${encodeURIComponent(calendarId)}/events/${encodeURIComponent(eventId)}`,
+      {
+        method: "DELETE",
+        headers: { Authorization: `Bearer ${token}` },
+        signal: AbortSignal.timeout(15_000),
+      },
+    );
+
+    if (response.status === 204 || response.status === 410 || response.status === 404) {
+      logger.info("Calendar event removed", { eventId, status: response.status });
+      return true;
+    }
+
+    logger.error("Could not remove the calendar event", {
+      eventId,
+      status: response.status,
+      // Left on the calendar, so a technician may still drive to a cancelled
+      // visit. Loud on purpose.
+      detail: (await response.text().catch(() => "")).slice(0, 200),
+    });
+    return false;
+  } catch (error) {
+    logger.error("Calendar event removal failed", {
+      eventId,
+      reason: error instanceof Error ? error.message : String(error),
+    });
+    return false;
+  }
+}
+
 export interface BusyInterval {
   start: Date;
   end: Date;

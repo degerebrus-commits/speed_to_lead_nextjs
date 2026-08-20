@@ -2,6 +2,7 @@ import type { Appointment, Lead } from "@prisma/client";
 
 import { prisma } from "@/lib/db";
 import { logger } from "@/lib/logger";
+import { deleteCalendarEvent } from "@/server/calendar/calendar-service";
 
 /**
  * Cancellation and reschedule, decided in application code.
@@ -102,6 +103,32 @@ export async function cancelAppointment(
 
   // The slot is freed by the status change alone: getAvailableSlots only
   // counts PENDING and CONFIRMED, so nothing else has to be undone.
+  //
+  // The calendar is a different matter. Cancelling here without removing the
+  // event left the visit on the technician's calendar: our database said
+  // cancelled, the customer had been told it was cancelled, and someone still
+  // drove out. A stale event is worse than never having booked, because it
+  // costs a journey rather than an opportunity.
+  //
+  // calendarEventId is cleared only on a confirmed removal, so a failure
+  // leaves the id in place and the row remains findable for a retry.
+  if (cancelled.calendarEventId) {
+    const removed = await deleteCalendarEvent(cancelled.calendarEventId);
+
+    if (removed) {
+      await prisma.appointment.update({
+        where: { id: cancelled.id },
+        data: { calendarEventId: null },
+      });
+      cancelled.calendarEventId = null;
+    } else {
+      logger.error("Cancelled appointment is still on the calendar", {
+        appointmentId: cancelled.id,
+        eventId: cancelled.calendarEventId,
+      });
+    }
+  }
+
   logger.info("Appointment cancelled", {
     leadId: lead.id,
     appointmentId: cancelled.id,
