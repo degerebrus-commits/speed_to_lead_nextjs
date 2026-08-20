@@ -6,7 +6,7 @@ not), `SPEC-COMPARISON.md` (how this differs from the Express build),
 `MISTAKES.md` (what went wrong and the rules that prevent it), and
 `STANDARDS.md`.
 
-**251 tests passing**, typecheck clean, production build succeeds, CI runs on
+**292 tests passing**, typecheck clean, production build succeeds, CI runs on
 every push.
 
 ---
@@ -155,33 +155,32 @@ Keep SMS_PROVIDER=console until those credentials exist.
    discussed with the customer and then left in message text, unqueryable. The
    other build's `record_qualification` tool idea closes this - the model
    extracts, the code still executes. Do not give it `book_appointment`.
-2. **A calendar view in the dashboard. Recommended next piece of work.**
+2. ~~**A calendar view in the dashboard.**~~ **Built 2026-08-20.**
 
-   The highest-value demo addition left. A prospect currently has to switch to
-   Google Calendar to see the payoff; putting it on the dashboard lands the
-   whole story on one screen - lead arrives, conversation happens, appointment
-   appears.
+   `getSchedule()` in `src/server/booking/schedule-queries.ts`, rendered as a
+   panel under the metric cards on `/`. Seven columns, one per day, each card a
+   time and a name linking to that lead's conversation. Empty days are rendered
+   rather than skipped - collapsing them would put Friday next to Monday and
+   read as a full week. Below 900px it stacks into a list with the day label on
+   the left.
 
-   No new Google calls needed. `Appointment.scheduledAt` is indexed for exactly
-   this, and each row joins to its lead for name, phone and address, so it
-   renders from our own database and works even when Google is down.
+   Reads only Postgres. These appointments were written to Google Calendar when
+   they were booked, but an owner who cannot see today's schedule because a
+   third party is down would rightly stop trusting the page.
 
-   Smallest useful version: a week view, seven columns, appointments in time
-   order showing name, phone and slot, each clicking through to that lead's
-   conversation. A "today" panel with the next visit highlighted is the part
-   that makes an owner say *that is my schedule*.
+   A customer who has opted out and still has a visit booked gets a flagged
+   card, which is the only place that combination is made urgent rather than
+   merely visible.
 
-   **Placement, decided 2026-08-20: on the dashboard, beneath the metric
-   cards.** Not a separate page and not a two-column split - the existing `/`
-   already has a metric row and a stalled-leads section, and the schedule is a
-   third section between them. Metric cards can be added over time without
-   disturbing it.
+   The grouping had the one real bug in it. Appointments are UTC instants shown
+   against the business's own calendar, and `2026-08-20T17:00Z` is the 21st in
+   Manila and the 20th in Chicago - group on the UTC date and a job lands on
+   the wrong day for eight months of the year. Tests pin a timezone rather than
+   inherit one, because asserting that an instant falls on a date means nothing
+   against an unknown offset, and a final spec runs one instant through two
+   zones to show the query holds no assumption about either.
 
-   Full page width means a seven-day column grid fits at roughly 145px per
-   day, enough for a time and a first name. A two-column layout would have
-   forced an agenda list instead.
-
-   **Read-only. Decided 2026-08-20, and not merely to save effort.**
+   **Read-only, decided 2026-08-20, and not merely to save effort.**
 
    Cancelling and rescheduling belong to the customer, over SMS, where they
    already work: the customer texts, the slot frees, they are told, and the
@@ -192,10 +191,10 @@ Keep SMS_PROVIDER=console until those credentials exist.
    The only route from software to human is emergency escalation, which alerts
    the owner and stops the assistant. Everything else stays in the conversation.
 
-   One decision still open: does the view show the business's other Google
-   events too, or only what this system booked? Showing both is more honest
-   about the technician's real day, and `getBusyIntervals` already performs
-   exactly that read for availability filtering.
+   Still open: does the view show the business's other Google events too, or
+   only what this system booked? Showing both is more honest about the
+   technician's real day, and `getBusyIntervals` already performs that read for
+   availability filtering.
 
 3. ~~**Google Calendar.**~~ **Done 2026-08-20.** Appointments are written to the
    business's calendar, availability is filtered against it, and cancelling
