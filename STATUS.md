@@ -171,6 +171,16 @@ Keep SMS_PROVIDER=console until those credentials exist.
    conversation. A "today" panel with the next visit highlighted is the part
    that makes an owner say *that is my schedule*.
 
+   **Placement, decided 2026-08-20: on the dashboard, beneath the metric
+   cards.** Not a separate page and not a two-column split - the existing `/`
+   already has a metric row and a stalled-leads section, and the schedule is a
+   third section between them. Metric cards can be added over time without
+   disturbing it.
+
+   Full page width means a seven-day column grid fits at roughly 145px per
+   day, enough for a time and a first name. A two-column layout would have
+   forced an agenda list instead.
+
    **Read-only. Decided 2026-08-20, and not merely to save effort.**
 
    Cancelling and rescheduling belong to the customer, over SMS, where they
