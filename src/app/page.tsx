@@ -109,6 +109,29 @@ export default async function DashboardPage() {
                   : "No opt-outs this window"
               }
             />
+            {/*
+              The bookings the business would not otherwise have. Every other
+              figure here also describes a business with someone answering the
+              phone; this one only exists because nobody was.
+            */}
+            <Metric
+              label="Booked after hours"
+              value={String(metrics.afterHoursBookings)}
+              note={
+                metrics.appointmentsBooked > 0
+                  ? `Of ${metrics.appointmentsBooked} booked, while closed`
+                  : "While the business was closed"
+              }
+            />
+            <Metric
+              label="Upcoming visits"
+              value={String(metrics.upcomingVisits)}
+              note={
+                metrics.nextVisitAt === null
+                  ? "Nothing scheduled"
+                  : `Next ${formatDateTime(metrics.nextVisitAt)}`
+              }
+            />
           </div>
 
           {stalled.length > 0 ? (

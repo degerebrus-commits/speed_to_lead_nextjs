@@ -248,6 +248,71 @@ describe("getDashboardMetrics", () => {
   });
 });
 
+describe("upcoming visits", () => {
+  const NOW = new Date("2026-08-20T02:00:00.000Z");
+
+  async function bookVisit(at: Date | null, status: "CONFIRMED" | "CANCELLED" = "CONFIRMED") {
+    const lead = await createLead({ createdAt: NOW });
+
+    return prisma.appointment.create({
+      data: {
+        leadId: lead.id,
+        slotLabel: "Mon-Fri 9am",
+        slotKey: `upcoming-${lead.id}`,
+        scheduledAt: at,
+        scheduledEndAt: at === null ? null : new Date(at.getTime() + 90 * 60 * 1000),
+        durationMinutes: 90,
+        status,
+        createdAt: NOW,
+      },
+    });
+  }
+
+  const hours = (n: number) => new Date(NOW.getTime() + n * 60 * 60 * 1000);
+
+  it("counts only visits still ahead, and names the soonest", async () => {
+    await bookVisit(hours(-3)); // already happened
+    await bookVisit(hours(48)); // later this week
+    await bookVisit(hours(6)); // the next one
+
+    const metrics = await getDashboardMetrics(30, NOW);
+
+    expect(metrics.upcomingVisits).toBe(2);
+    expect(metrics.nextVisitAt?.toISOString()).toBe(hours(6).toISOString());
+  });
+
+  it("ignores cancelled visits", async () => {
+    // A cancelled visit is not on anyone's day. Counting it would tell an
+    // owner they have work they do not have.
+    await bookVisit(hours(4), "CANCELLED");
+    await bookVisit(hours(9));
+
+    const metrics = await getDashboardMetrics(30, NOW);
+
+    expect(metrics.upcomingVisits).toBe(1);
+    expect(metrics.nextVisitAt?.toISOString()).toBe(hours(9).toISOString());
+  });
+
+  it("looks past the reporting window rather than stopping at its edge", async () => {
+    // Every other figure is bounded by windowDays. This one must not be: a
+    // visit booked for six weeks out is still a visit the owner has coming up.
+    await bookVisit(hours(24 * 45));
+
+    const metrics = await getDashboardMetrics(30, NOW);
+
+    expect(metrics.upcomingVisits).toBe(1);
+  });
+
+  it("reports nothing scheduled when there is nothing ahead", async () => {
+    await bookVisit(hours(-1));
+
+    const metrics = await getDashboardMetrics(30, NOW);
+
+    expect(metrics.upcomingVisits).toBe(0);
+    expect(metrics.nextVisitAt).toBeNull();
+  });
+});
+
 describe("getStalledLeads", () => {
   it("returns leads never texted, oldest first, with how long they have waited", async () => {
     const now = new Date("2026-03-10T15:00:00Z");

@@ -46,6 +46,17 @@ export interface DashboardMetrics {
   messagesReceived: number;
   /** Leads who texted STOP in the window. */
   optOuts: number;
+
+  /**
+   * Visits still ahead, and when the soonest one is.
+   *
+   * Deliberately not bounded by the reporting window. Every other figure here
+   * looks back over the last N days; this one looks forward, and an owner
+   * asking "what have I got coming up" does not mean "within the same N days I
+   * happen to be reporting on".
+   */
+  upcomingVisits: number;
+  nextVisitAt: Date | null;
 }
 
 /** A lead needing attention, for the dashboard's action list. */
@@ -84,7 +95,7 @@ export async function getDashboardMetrics(
   const windowStart = startOfWindow(windowDays, now);
   const inWindow = { gte: windowStart, lte: now };
 
-  const [leads, appointments, messagesSent, messagesReceived, optOuts] =
+  const [leads, appointments, messagesSent, messagesReceived, optOuts, upcoming] =
     await Promise.all([
       prisma.lead.findMany({
         where: { createdAt: inWindow },
@@ -97,6 +108,18 @@ export async function getDashboardMetrics(
       prisma.message.count({ where: { direction: "OUTBOUND", createdAt: inWindow } }),
       prisma.message.count({ where: { direction: "INBOUND", createdAt: inWindow } }),
       prisma.lead.count({ where: { smsOptedOutAt: inWindow } }),
+      // Forward-looking, so no window: `gte: now` rather than `inWindow`.
+      // Cancelled visits are excluded by status; a slot label that never
+      // resolved to an instant has a null scheduledAt and cannot be counted as
+      // upcoming, which the gte comparison excludes on its own.
+      prisma.appointment.findMany({
+        where: {
+          status: { in: ["PENDING", "CONFIRMED"] },
+          scheduledAt: { gte: now },
+        },
+        select: { scheduledAt: true },
+        orderBy: { scheduledAt: "asc" },
+      }),
     ]);
 
   const contacted = leads.filter((lead) => lead.introSmsSentAt !== null);
@@ -138,6 +161,9 @@ export async function getDashboardMetrics(
     messagesSent,
     messagesReceived,
     optOuts,
+
+    upcomingVisits: upcoming.length,
+    nextVisitAt: upcoming[0]?.scheduledAt ?? null,
   };
 }
 
