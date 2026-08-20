@@ -1,5 +1,6 @@
 import Link from "next/link";
 
+import { getBusinessProfile } from "@/config/business";
 import { formatDateParts, formatDateTime, formatDuration, formatTime } from "@/lib/format";
 import { getDashboardMetrics, getStalledLeads } from "@/server/analytics/metrics-service";
 import { getSchedule } from "@/server/booking/schedule-queries";
@@ -37,15 +38,32 @@ export default async function DashboardPage() {
   ]);
 
   const scheduleTotal = schedule.reduce((sum, day) => sum + day.visits.length, 0);
+  const business = getBusinessProfile();
 
   const hasAnyLeads = metrics.leadsReceived > 0 || stalled.length > 0;
 
   return (
     <>
-      <h2>Dashboard</h2>
-      <p className="subtitle">
-        Last {metrics.windowDays} days, since {formatDateTime(metrics.windowStart)}.
-      </p>
+      {/*
+        The client's own mark, on their own dashboard. Rendered only when
+        BUSINESS_LOGO points at a file - a fresh clone has no logo and must
+        still open, which the .env.example test enforces.
+
+        Plain <img> rather than next/image: this is one small asset served from
+        public/ on a single-tenant deployment, and the optimiser would earn
+        nothing against the configuration it would cost.
+      */}
+      <div className="brand">
+        {business.logo === "" ? null : (
+          <img className="brand-logo" src={business.logo} alt="" />
+        )}
+        <div>
+          <h2>{business.name}</h2>
+          <p className="subtitle">
+            Last {metrics.windowDays} days, since {formatDateTime(metrics.windowStart)}.
+          </p>
+        </div>
+      </div>
 
       {!hasAnyLeads ? (
         <div className="empty-state">

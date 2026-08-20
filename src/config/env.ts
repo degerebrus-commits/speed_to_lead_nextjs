@@ -161,6 +161,11 @@ const baseSchema = z.object({
   // --- Client identity, continued -----------------------------------------
   /** Name the AI signs messages with. */
   REP_NAME: z.string().min(1).default("the team"),
+  /**
+   * Path under public/ to the client per-deployment logo, e.g.
+   * "/logo.png". Empty by default so a fresh clone renders without one.
+   */
+  BUSINESS_LOGO: z.string().default(""),
   BUSINESS_TIMEZONE: z.string().min(1).default("UTC"),
   /** Human-readable opening hours, quoted to customers verbatim. */
   BUSINESS_HOURS: z.string().min(1).default("Monday to Friday, 9am to 5pm"),

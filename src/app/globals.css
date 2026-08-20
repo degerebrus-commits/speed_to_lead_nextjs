@@ -553,3 +553,37 @@ tbody tr:last-child td {
     margin-bottom: 4px;
   }
 }
+
+/*
+ * The client's mark beside their name, on their own dashboard.
+ *
+ * The logo is optional configuration, so this has to look deliberate with no
+ * image at all - hence the flex row rather than a reserved box that would sit
+ * empty on a deployment that never sets one.
+ */
+.brand {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  margin-bottom: 20px;
+}
+
+.brand h2 {
+  margin: 0 0 2px;
+}
+
+.brand .subtitle {
+  margin: 0;
+}
+
+/*
+ * Bounded on both axes: a client supplies whatever file they have, and a tall
+ * or very wide one must not push the metrics off the fold.
+ */
+.brand-logo {
+  max-height: 44px;
+  max-width: 160px;
+  width: auto;
+  height: auto;
+  object-fit: contain;
+}

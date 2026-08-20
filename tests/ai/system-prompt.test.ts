@@ -4,6 +4,7 @@ import { buildSystemPrompt } from "@/server/ai/system-prompt";
 
 const hvac: BusinessProfile = {
   name: "Comfort Pro Heating and Air",
+  logo: "",
   repName: "Dustin",
   countryCode: "+1",
   timezone: "America/Chicago",

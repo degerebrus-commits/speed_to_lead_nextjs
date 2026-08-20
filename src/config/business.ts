@@ -14,6 +14,12 @@ import { getEnv } from "@/config/env";
 export interface BusinessProfile {
   /** Rendered into customer-facing SMS copy. */
   name: string;
+  /**
+   * Path to the client's logo, served from `public/`. Empty means none is
+   * configured, and the dashboard shows the business name alone - a fresh
+   * clone has no logo file and must still render.
+   */
+  logo: string;
   /** Name the assistant signs messages with. */
   repName: string;
   /** E.164 calling code applied to phone numbers submitted without one. */
@@ -67,6 +73,7 @@ export function getBusinessProfile(): BusinessProfile {
 
   return {
     name: env.BUSINESS_NAME,
+    logo: env.BUSINESS_LOGO,
     repName: env.REP_NAME,
     countryCode: env.BUSINESS_COUNTRY_CODE,
     timezone: env.BUSINESS_TIMEZONE,
