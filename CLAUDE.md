@@ -40,3 +40,13 @@ When a test uses real external systems (Google Calendar, SMS gateways):
 - Document why the test isolation exists
 - Verify isolation with an explicit assertion (confirm the real system was NOT reached)
 - Record any found gaps in MISTAKES.md with the prevention rule
+
+## Out of scope: the client's paperwork
+
+A2P 10DLC registration and the SMS provider account belong to whichever client
+the deployment is sold to, filed under their business. They are not project
+tasks, not blockers on this codebase, and do not belong in status reports,
+outstanding lists, or "what's next" summaries.
+
+Mention them only when asked directly, or when a code decision genuinely turns
+on one.
