@@ -446,6 +446,10 @@ tbody tr:last-child td {
   grid-template-columns: repeat(7, minmax(0, 1fr));
   gap: 8px;
   margin-bottom: 32px;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  padding: 16px;
 }
 
 .schedule-day {
@@ -469,11 +473,15 @@ tbody tr:last-child td {
   color: var(--text-muted);
 }
 
+/*
+ * The page background rather than the surface: these sit inside a white panel,
+ * and a white card on a white panel is only its border.
+ */
 .visit {
   display: block;
   margin-bottom: 6px;
   padding: 8px 10px;
-  background: var(--surface);
+  background: var(--bg);
   border: 1px solid var(--border);
   border-radius: var(--radius);
   text-decoration: none;
@@ -519,15 +527,21 @@ tbody tr:last-child td {
 @media (max-width: 900px) {
   .schedule-grid {
     grid-template-columns: 1fr;
-    gap: 4px;
+    gap: 0;
+    padding: 4px 16px;
   }
 
   .schedule-day {
     display: flex;
     align-items: baseline;
     gap: 12px;
-    padding: 6px 0;
+    padding: 10px 0;
     border-bottom: 1px solid var(--border);
+  }
+
+  /* The panel already closes the list; a rule under the last row doubles it. */
+  .schedule-day:last-child {
+    border-bottom: none;
   }
 
   .schedule-date {
