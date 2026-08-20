@@ -155,10 +155,41 @@ Keep SMS_PROVIDER=console until those credentials exist.
    discussed with the customer and then left in message text, unqueryable. The
    other build's `record_qualification` tool idea closes this - the model
    extracts, the code still executes. Do not give it `book_appointment`.
-2. **An upcoming-appointments view.** Appointments now carry `scheduledAt`, so
-   "what is on tomorrow" is finally answerable and nothing displays it.
-3. **Google Calendar.** The largest PRD divergence, and genuinely optional
-   while fixed slots serve the MVP. Needs the timestamps that now exist.
+2. **A calendar view in the dashboard. Recommended next piece of work.**
+
+   The highest-value demo addition left. A prospect currently has to switch to
+   Google Calendar to see the payoff; putting it on the dashboard lands the
+   whole story on one screen - lead arrives, conversation happens, appointment
+   appears.
+
+   No new Google calls needed. `Appointment.scheduledAt` is indexed for exactly
+   this, and each row joins to its lead for name, phone and address, so it
+   renders from our own database and works even when Google is down.
+
+   Smallest useful version: a week view, seven columns, appointments in time
+   order showing name, phone and slot, each clicking through to that lead's
+   conversation. A "today" panel with the next visit highlighted is the part
+   that makes an owner say *that is my schedule*.
+
+   **Read-only. Decided 2026-08-20, and not merely to save effort.**
+
+   Cancelling and rescheduling belong to the customer, over SMS, where they
+   already work: the customer texts, the slot frees, they are told, and the
+   calendar event is removed. A cancel button on the dashboard would be a
+   second path to the same state, and two paths to one state drift apart - the
+   business cancels, the customer is never told, and they wait in all morning.
+
+   The only route from software to human is emergency escalation, which alerts
+   the owner and stops the assistant. Everything else stays in the conversation.
+
+   One decision still open: does the view show the business's other Google
+   events too, or only what this system booked? Showing both is more honest
+   about the technician's real day, and `getBusyIntervals` already performs
+   exactly that read for availability filtering.
+
+3. ~~**Google Calendar.**~~ **Done 2026-08-20.** Appointments are written to the
+   business's calendar, availability is filtered against it, and cancelling
+   removes the event. Service-account JWT over `node:crypto`, no SDK.
 4. **`STANDARDS.md` §13/§14/§15/§57.3.** They mandate multi-tenancy and
    OWNER/ADMIN/STAFF roles, which this build deliberately does not have. Still
    untouched pending permission; the contradiction resurfaces every session.
@@ -432,3 +463,44 @@ while the unsolicited first contact waits for the window. `introSmsSentAt` is
 already the queue of leads owed a first message, so the mechanism is half built.
 
 Needs a policy decision before a client goes live.
+
+---
+
+## Cancelling works but is invisible - fix before a client sees it
+
+A customer can cancel a booked visit by texting "cancel my appointment",
+"never mind", "don't come" and a few others. It frees the slot, confirms
+plainly, and removes the Google Calendar event. Built and tested.
+
+**Nothing tells them the word exists.** The booking confirmation offers only
+STOP and HELP, and the HELP reply points at the owner's phone number without
+mentioning cancellation. So STOP is the only word on offer, and it reads like
+the cancel button.
+
+Observed live on 2026-08-20: the tester texted STOP intending to stop. The
+number was opted out, and two confirmed visits stayed booked and on the
+calendar. The customer is now uncontactable by the system and two technicians
+are still scheduled to drive out.
+
+**The fix is one line** - advertise CANCEL in
+`SMS_BOOKING_CONFIRMATION_TEMPLATE`, and consider dropping STOP from that
+particular message, since offering STOP beside CANCEL invites the confusion.
+STOP still works and still appears in the HELP reply, which is what CTIA
+guidance actually asks for.
+
+**A policy decision left open: should STOP also cancel upcoming appointments?**
+An uncontactable customer with a booked visit is a wasted journey waiting to
+happen. Against that, opting out of texts is not the same as calling off a
+service call. Business decision, not a code one.
+
+**Related, and small: flag "opted out with an upcoming appointment" on the
+dashboard.** One query - leads with `smsOptedOutAt` set and a CONFIRMED
+appointment still in the future. The owner has the customer's number and can
+always call, but only if something tells them to; today the first signal is a
+technician standing outside a house. Fits naturally beside the calendar view.
+
+Worth stating because it shapes all of the above: **the captured phone number
+is itself the asset.** Every lead carries a verified mobile, a name, an address
+and the problem in the customer's own words, whether or not they booked. An
+opted-out number stays valuable for a human call - what STOP ends is the
+automation, not the relationship, and the code enforces that at every send.
