@@ -694,30 +694,58 @@ existing row would need backfilling into an organization. Deciding to build a
 SaaS platform is a decision to start that work deliberately — not something to
 be arrived at by adding a column.
 
-## Related contradictions still outstanding
+## Related
 
-Section 26 (Roles & Permissions) specifies OWNER / ADMIN / STAFF roles, which
-this build also does not have, for the same reason: there is one business and
-one login. `STANDARDS.md` §13, §14, §15 and §57.3 carry the same multi-tenant
-assumption and have not been amended.
+Section 26 followed from this one and was corrected at the same time: with one
+business per deployment there is no organization to hold roles within, so access
+is a single shared login.
+
+`STANDARDS.md` §13, §14, §15 and §57.3 still carry the multi-tenant assumption.
+That file is shared with other projects, so amending it is a wider decision than
+this document and has deliberately been left alone.
 
 ---
 
-# 26. Roles & Permissions
+# 26. Access
 
-## OWNER
+**Corrected 2026-08-20.** This section previously specified OWNER / ADMIN /
+STAFF roles. It follows section 25: with one business per deployment, there is
+no organization to hold roles within.
 
-Full organization access.
+Access is a single shared login protecting the dashboard, verified server-side
+on every page. There are no user accounts, no role column, and no per-role
+permission checks.
 
-## ADMIN
+## What is actually enforced
 
-Operational and configuration access.
+Every dashboard route calls `requireSession()` before reading any data. An
+unauthenticated request is redirected before a query runs, and a forged session
+cookie fails signature verification rather than yielding a partial page — both
+are covered by tests, because "the page redirected" is not the same claim as
+"no customer data was in the response".
 
-## STAFF
+The API routes are separately protected: the lead webhook by a shared secret,
+the inbound SMS webhooks by provider signature verification. Those are machine
+callers and never see the session.
 
-Access to leads, conversations, appointments, and permitted operational actions.
+## Why one login is enough here
 
-Permissions should be enforced on the backend.
+The people using this are an owner and possibly one or two office staff, in one
+business, all of whom are already trusted with the customer list. A role system
+would be enforcing a distinction nobody in the building is asking for, and
+every role check is a place to get authorization wrong.
+
+## What this costs, honestly
+
+There is no audit trail of *who* did something, because the system cannot tell
+two staff members apart. If a lead is mishandled, the record shows what happened
+and not who was at the keyboard. For a small team that is acceptable; for a
+business that grows past trusting everyone with everything, it is the first
+thing that needs building.
+
+Adding roles later means adding user accounts first. That is a real piece of
+work, but unlike multi-tenancy it is additive — it does not require rewriting
+how existing rows are queried.
 
 ---
 
