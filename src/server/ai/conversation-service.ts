@@ -273,7 +273,31 @@ export async function handleCustomerReply(
   const openCandidates = await getOpenSlotCandidates(new Date(), declined);
   const offeredSlots = openCandidates.slice(0, getBookingSettings().offerCount);
 
-  if (openCandidates.length > 0 || previouslyOffered.length > 0) {
+  // A customer who already has a visit booked is not asking for another one.
+  //
+  // The guard this replaces was intent matching alone, and intent matching
+  // cannot carry it: the phrases are substring-matched, so "book" fires on
+  // "thanks for the booking". A real customer said exactly that, was offered
+  // three more times, and ended up with two technicians dispatched to one
+  // house on the same afternoon.
+  //
+  // Cancel and reschedule are handled earlier and release the appointment
+  // first, so a genuine change of plan still reaches the offer below. Anything
+  // else from an already-booked customer belongs to the model, which can say
+  // something sensible rather than pushing a list at them.
+  const existingAppointment = await prisma.appointment.findFirst({
+    where: { leadId: lead.id, status: { in: ["PENDING", "CONFIRMED"] } },
+    select: { id: true, slotLabel: true },
+  });
+
+  if (existingAppointment) {
+    logger.info("Booking block skipped: lead already has an appointment", {
+      leadId: lead.id,
+      appointmentId: existingAppointment.id,
+    });
+  }
+
+  if (!existingAppointment && (openCandidates.length > 0 || previouslyOffered.length > 0)) {
     // Two passes, and the order matters.
     //
     // First against what this customer was actually shown, where a bare digit

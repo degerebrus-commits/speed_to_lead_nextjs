@@ -255,6 +255,50 @@ describe("handleCustomerReply", () => {
       expect(appointment.slotLabel).toBe("Sat 10am");
     });
 
+    it("does not offer more slots to a customer who is already booked", async () => {
+      // Observed in a live SMS test: the customer replied "Yes thanks for the
+      // booking", which contains "book", so intent matching fired and offered
+      // three more times. They picked one out of politeness and ended up with
+      // two appointments on the same afternoon - two technicians, one house.
+      //
+      // Intent matching cannot fix this. The phrases are substring-matched, so
+      // "book" fires on "booking" no matter how the list is worded. What
+      // settles it is the appointment that already exists.
+      const ai = installAi("Glad we could help - see you then!");
+      const lead = await seedLead();
+
+      await handleCustomerReply(lead, "Can I book someone in?");
+      await handleCustomerReply(lead, "1");
+      expect(await prisma.appointment.count({ where: { leadId: lead.id } })).toBe(1);
+
+      const before = sent.length;
+      const outcome = await handleCustomerReply(lead, "Yes thanks for the booking");
+
+      // Still exactly one appointment, and no numbered list was pushed at them.
+      expect(await prisma.appointment.count({ where: { leadId: lead.id } })).toBe(1);
+      expect(outcome.kind).not.toBe("slots-offered");
+      expect(sent.slice(before).some((m) => m.body.includes("reply with the number"))).toBe(false);
+
+      // It reaches the model instead, which can answer a thank-you naturally.
+      expect(ai.calls).toBe(1);
+    });
+
+    it("still lets an already-booked customer reschedule", async () => {
+      // The guard above must not trap someone who genuinely wants to change:
+      // reschedule releases the appointment first, so the offer still reaches
+      // them.
+      installAi("should not be used");
+      const lead = await seedLead();
+
+      await handleCustomerReply(lead, "Can I book someone in?");
+      await handleCustomerReply(lead, "1");
+
+      const outcome = await handleCustomerReply(lead, "can we reschedule");
+
+      expect(outcome.kind).toBe("slots-offered");
+      expect(outcome.reply).toContain("reply with the number");
+    });
+
     it("offers a different set when the customer turns the first one down", async () => {
       const ai = installAi("should not be used");
       const lead = await seedLead();
