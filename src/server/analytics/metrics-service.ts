@@ -179,7 +179,15 @@ export async function getStalledLeads(
   now: Date = new Date(),
 ): Promise<StalledLead[]> {
   const stranded = await prisma.lead.findMany({
-    where: { introSmsSentAt: null, smsOptedOutAt: null },
+    where: {
+      introSmsSentAt: null,
+      smsOptedOutAt: null,
+      // A lead held for quiet hours is waiting, not stuck. Listing it here
+      // would raise "still waiting for a first message" every night for
+      // something working exactly as intended, and an alarm that cries wolf
+      // stops being read.
+      OR: [{ introSmsDeferredUntil: null }, { introSmsDeferredUntil: { lte: now } }],
+    },
     orderBy: { createdAt: "asc" },
     take: limit,
     select: { id: true, name: true, phone: true, createdAt: true },

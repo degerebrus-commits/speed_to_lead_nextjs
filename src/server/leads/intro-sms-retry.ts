@@ -40,6 +40,13 @@ export async function retryPendingIntroSms(
   const pending = await prisma.lead.findMany({
     where: {
       introSmsSentAt: null,
+      // A lead held for quiet hours is not due yet. Attempting it would burn a
+      // batch slot on a send that sendIntroSms will refuse anyway, and the
+      // reported numbers would describe work that never happened.
+      OR: [
+        { introSmsDeferredUntil: null },
+        { introSmsDeferredUntil: { lte: new Date() } },
+      ],
       // An opted-out lead is filtered here as well as inside sendIntroSms.
       // Belt and braces: this keeps them out of the batch count entirely, so
       // the numbers reported describe real work rather than known no-ops.
@@ -104,6 +111,13 @@ export async function retryPendingIntroSms(
 /** How many leads are still owed a first message. */
 export async function countPendingIntroSms(): Promise<number> {
   return prisma.lead.count({
-    where: { introSmsSentAt: null, smsOptedOutAt: null },
+    where: {
+      introSmsSentAt: null,
+      smsOptedOutAt: null,
+      OR: [
+        { introSmsDeferredUntil: null },
+        { introSmsDeferredUntil: { lte: new Date() } },
+      ],
+    },
   });
 }

@@ -65,6 +65,10 @@ model Lead {
   /// Null until the introductory SMS is confirmed sent. Doubles as the work
   /// queue for the retry job that arrives with the real SMS provider.
   introSmsSentAt DateTime?
+  /// Set when the intro text was held for quiet hours rather than failing.
+  /// Distinguishes a lead waiting for morning from one nothing reached, which
+  /// otherwise both read as a null introSmsSentAt and raise a false alarm.
+  introSmsDeferredUntil DateTime?
 
   /// Set when the customer texts STOP. Consumer SMS opt-out is not optional -
   /// once set, nothing may text this lead again.

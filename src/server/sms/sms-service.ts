@@ -3,6 +3,7 @@ import { getBusinessProfile, getMessageTemplates } from "@/config/business";
 import { getEnv } from "@/config/env";
 import { prisma } from "@/lib/db";
 import { logger } from "@/lib/logger";
+import { nextSendableAt } from "./quiet-hours";
 import { consoleSmsProvider } from "./console-sms-provider";
 import { smsGateProvider } from "./sms-gate-provider";
 import { twilioSmsProvider } from "./twilio-sms-provider";
@@ -47,7 +48,7 @@ export function getSmsProvider(): SmsProvider {
 export class SmsSuppressedError extends Error {
   constructor(
     message: string,
-    readonly reason: "opted-out" | "quota-exhausted" | "no-consent",
+    readonly reason: "opted-out" | "quota-exhausted" | "no-consent" | "quiet-hours",
   ) {
     super(message);
     this.name = "SmsSuppressedError";
@@ -115,6 +116,32 @@ export async function sendIntroSms(lead: Lead): Promise<void> {
     throw new SmsSuppressedError(
       `Lead ${lead.id} has no recorded SMS consent`,
       "no-consent",
+    );
+  }
+
+  // Quiet hours. This is the one message the business starts, so it is the one
+  // the law and the carriers care about the time of - a reply to someone who
+  // just texted goes out at any hour and is deliberately not checked here.
+  //
+  // Held rather than dropped: the timestamp is when it may go, and the retry
+  // endpoint releases it. Recording that separately from introSmsSentAt is what
+  // stops an overnight lead reading as a lead nothing reached.
+  const sendableAt = nextSendableAt();
+
+  if (sendableAt !== null) {
+    await prisma.lead.update({
+      where: { id: lead.id },
+      data: { introSmsDeferredUntil: sendableAt },
+    });
+
+    logger.info("Intro SMS held for quiet hours", {
+      leadId: lead.id,
+      sendableAt: sendableAt.toISOString(),
+    });
+
+    throw new SmsSuppressedError(
+      `Lead ${lead.id} held until ${sendableAt.toISOString()}`,
+      "quiet-hours",
     );
   }
 

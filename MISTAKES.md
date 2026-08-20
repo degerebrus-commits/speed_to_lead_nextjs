@@ -449,3 +449,32 @@ that key was never the problem.
 first hypothesis is that a person did it, not that a second system exists. Ask.
 And treat evidence of human authorship - typos, inconsistent formatting, an
 odd hour - as evidence, rather than only as proof of what it is not.
+
+---
+
+## A test double that returned duplicate ids under concurrency
+
+**What happened.** Adding quiet hours turned five retry tests red. They passed
+alone, passed in every pair I tried, and failed in the full suite - so I blamed
+the new feature twice: first a leaked `BUSINESS_TIMEZONE` putting the suite
+inside the quiet window, then the new database column. Both were real problems
+and neither was this one.
+
+The actual error was `Unique constraint failed on (providerMessageId)`. The spy
+provider returned `` `spy-${sent.length}` `` - reading the array length *before*
+pushing. `retryPendingIntroSms` sends concurrently, so two sends could both read
+the same length and hand back the same id.
+
+**Root cause.** The double was not faithful to the thing it stood in for. A real
+gateway never returns the same message id twice; this one did, given the right
+interleaving. The bug had been latent for as long as the double existed, and a
+new test file changed the scheduling enough to surface it.
+
+**The correct fix.** A counter incremented on each call, never reset, as a real
+provider's ids behave. The three doubles in that file now share it.
+
+**Prevention rule.** A test double must hold the invariants of the real thing,
+not merely its shape - unique ids stay unique, monotonic clocks stay monotonic.
+And when a test passes alone but fails in the suite, read the error before
+forming a theory: "my new feature broke it" is a hypothesis, and the exception
+text was naming a different culprit the whole time.

@@ -166,6 +166,16 @@ const baseSchema = z.object({
    * "/logo.png". Empty by default so a fresh clone renders without one.
    */
   BUSINESS_LOGO: z.string().default(""),
+  /**
+   * Quiet hours suppress the unsolicited intro text only. Replies to a
+   * customer who just texted are unaffected - they are awake and waiting.
+   * Hours are on the business wall clock and the window may wrap midnight.
+   */
+  // Not z.coerce.boolean(): Boolean("false") is true, so the flag could never
+  // turn the feature off. Matches AFTER_HOURS_REPLY_ENABLED below.
+  QUIET_HOURS_ENABLED: z.enum(["true", "false"]).default("true"),
+  QUIET_HOURS_START: z.coerce.number().int().min(0).max(23).default(21),
+  QUIET_HOURS_END: z.coerce.number().int().min(0).max(23).default(8),
   BUSINESS_TIMEZONE: z.string().min(1).default("UTC"),
   /** Human-readable opening hours, quoted to customers verbatim. */
   BUSINESS_HOURS: z.string().min(1).default("Monday to Friday, 9am to 5pm"),

@@ -1,4 +1,7 @@
 import { beforeEach, describe, expect, it } from "vitest";
+
+/** Never reset: ids must be unique for the life of the process, as a real gateway's are. */
+let spyCounter = 0;
 import { resetEnvCache } from "@/config/env";
 import { prisma } from "@/lib/db";
 import { countPendingIntroSms, retryPendingIntroSms } from "@/server/leads/intro-sms-retry";
@@ -12,7 +15,11 @@ function installSpy(): SmsMessage[] {
     name: "spy",
     async send(message) {
       sent.push(message);
-      return { providerMessageId: `spy-${sent.length}`, provider: "spy" };
+      // A counter, not sent.length. The length is read before the push, so two
+      // concurrent sends - which retryPendingIntroSms does issue - both saw the
+      // same value and returned the same id, tripping the unique constraint on
+      // providerMessageId. Passed alone, failed under a loaded suite.
+      return { providerMessageId: `spy-${++spyCounter}`, provider: "spy" };
     },
   });
 
@@ -109,7 +116,7 @@ describe("retryPendingIntroSms", () => {
       name: "metered",
       async send(message) {
         sent.push(message);
-        return { providerMessageId: `metered-${sent.length}`, provider: "metered" };
+        return { providerMessageId: `metered-${++spyCounter}`, provider: "metered" };
       },
     });
 
@@ -140,7 +147,7 @@ describe("retryPendingIntroSms", () => {
       async send(message) {
         if (message.to === failing.phone) throw new Error("gateway rejected");
         sent.push(message);
-        return { providerMessageId: `ok-${sent.length}`, provider: "flaky" };
+        return { providerMessageId: `ok-${++spyCounter}`, provider: "flaky" };
       },
     });
 

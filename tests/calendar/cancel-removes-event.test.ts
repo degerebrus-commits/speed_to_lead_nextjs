@@ -104,9 +104,18 @@ beforeEach(() => {
   resetGoogleTokenCache();
 });
 
+/*
+ * Restore only the keys this file sets. Replacing process.env wholesale
+ * discards anything a later hook added, and leaks whatever this file left
+ * behind into the next - a lesson from schedule-queries, where a stray
+ * timezone put a different suite inside quiet hours.
+ */
 afterEach(() => {
   vi.unstubAllGlobals();
-  process.env = { ...ORIGINAL };
+  for (const key of ["GOOGLE_CLIENT_EMAIL", "GOOGLE_PRIVATE_KEY", "GOOGLE_CALENDAR_ID"]) {
+    if (ORIGINAL[key] === undefined) delete process.env[key];
+    else process.env[key] = ORIGINAL[key];
+  }
   resetEnvCache();
   resetGoogleTokenCache();
 });

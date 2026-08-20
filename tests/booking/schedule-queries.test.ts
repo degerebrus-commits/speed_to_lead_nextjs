@@ -1,4 +1,4 @@
-import { beforeEach, describe, expect, it } from "vitest";
+import { afterEach, beforeEach, describe, expect, it } from "vitest";
 
 import { resetEnvCache } from "@/config/env";
 import { prisma } from "@/lib/db";
@@ -28,8 +28,22 @@ import { getSchedule } from "@/server/booking/schedule-queries";
  */
 const MANILA = "Asia/Manila";
 
+const ORIGINAL_TIMEZONE = process.env.BUSINESS_TIMEZONE;
+
 beforeEach(() => {
   process.env.BUSINESS_TIMEZONE = MANILA;
+  resetEnvCache();
+});
+
+/*
+ * Restore the single key this file touches, rather than replacing process.env
+ * wholesale. Without this the last spec left BUSINESS_TIMEZONE on Chicago, and
+ * a later file sending intro texts found itself inside quiet hours - five
+ * failures in a suite where every one of these specs passed alone.
+ */
+afterEach(() => {
+  if (ORIGINAL_TIMEZONE === undefined) delete process.env.BUSINESS_TIMEZONE;
+  else process.env.BUSINESS_TIMEZONE = ORIGINAL_TIMEZONE;
   resetEnvCache();
 });
 
