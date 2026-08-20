@@ -1,0 +1,116 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+  <link rel="stylesheet" href="_ds/modernist-8c319dda-d131-47ca-b156-82ffd74fcb7c/styles.css">
+  <script src="_ds/modernist-8c319dda-d131-47ca-b156-82ffd74fcb7c/_ds_bundle.js"></script>
+  <script src="./doc-page.js"></script>
+  <style>doc-page:not(:defined){visibility:hidden}
+  html{lang:en}
+  .prop-table{width:100%;border-collapse:collapse;margin:16px 0 8px}
+  .prop-table th,.prop-table td{text-align:left;padding:10px 12px;border-bottom:1px solid var(--color-neutral-300)}
+  .prop-table th{font-family:var(--font-heading);font-weight:600;color:var(--color-text);border-bottom:2px solid var(--color-text)}
+  .prop-table tfoot td{border-bottom:none;border-top:2px solid var(--color-text);font-weight:600}
+  h1,h2,h3{font-family:var(--font-heading);font-weight:700;text-wrap:balance}
+  p,li{font-family:var(--font-body);line-height:1.65;color:var(--color-text)}
+  ul{margin:8px 0 0;padding-left:20px}
+  li{margin-bottom:4px}
+  </style>
+</helmet>
+
+<doc-page size="letter" margin="0.85in">
+
+  <div style="display:flex;justify-content:space-between;align-items:flex-end;border-bottom:2px solid var(--color-text);padding-bottom:16px;margin-bottom:32px">
+    <div>
+      <div style="font-family:var(--font-heading);font-weight:700;font-size:13px;letter-spacing:0.06em;text-transform:uppercase;color:var(--color-accent-700)">Fieldwork Studio</div>
+      <h1 style="margin:6px 0 0;font-size:32px">AI Lead Response &amp; Appointment Booking Assistant</h1>
+    </div>
+    <div style="text-align:right;font-size:13px;color:var(--color-neutral-700)">
+      Prepared for Aldergate Heating &amp; Air<br>
+      August 18, 2026
+    </div>
+  </div>
+
+  <h2 style="font-size:15px;letter-spacing:0.04em;text-transform:uppercase;margin:0 0 10px">Executive Summary</h2>
+  <p>Aldergate Heating &amp; Air loses jobs every week to the first competitor who responds. Fieldwork Studio proposes an AI lead engagement system that texts every new website lead within 30 seconds, qualifies the service need over SMS, and books the appointment directly into Google Calendar — with no staff intervention required.</p>
+  <p>The system replaces hours of manual texting with an instant, always-on conversation, and gives Aldergate a dashboard to monitor every lead, conversation, and booking as it happens.</p>
+
+  <div class="hr" style="margin:28px 0"></div>
+
+  <h2 style="font-size:15px;letter-spacing:0.04em;text-transform:uppercase;margin:0 0 10px">Background</h2>
+  <p>Aldergate receives leads through its website, but response time is inconsistent. Leads submitted outside business hours, during a job, or during a busy stretch often wait minutes to hours for a reply — and by then, many homeowners have already contacted another contractor.</p>
+  <p>The underlying issues are common across the trade: slow response times, missed after-hours opportunities, staff spending significant time on manual texting, low conversion from inquiry to booked appointment, and inconsistent communication from lead to lead. An automated system that engages every lead immediately closes this gap.</p>
+
+  <div class="hr" style="margin:28px 0"></div>
+
+  <h2 style="font-size:15px;letter-spacing:0.04em;text-transform:uppercase;margin:0 0 10px">Proposed Solution</h2>
+  <p>We will build and deploy an AI SMS assistant around the following flow:</p>
+  <ul>
+    <li><strong>Instant acknowledgment.</strong> The moment a website lead comes in, the AI texts the customer by name within 30 seconds, introducing itself and acknowledging the request.</li>
+    <li><strong>Qualification.</strong> The AI asks natural follow-up questions — issue type, urgency, when it started, location — and answers common questions on service areas, availability, and basic pricing.</li>
+    <li><strong>Booking.</strong> The AI checks live Google Calendar availability, offers open time slots, confirms the customer's choice, and creates the calendar event automatically, preventing double-booking.</li>
+    <li><strong>Confirmation.</strong> The customer receives an SMS confirmation, and the appointment appears on Aldergate's calendar with no manual entry.</li>
+    <li><strong>Human handoff.</strong> Staff can take over any conversation at any time, and the AI escalates automatically for emergencies or low-confidence situations per Aldergate's business rules.</li>
+  </ul>
+
+  <div class="hr" style="margin:28px 0"></div>
+
+  <h2 style="font-size:15px;letter-spacing:0.04em;text-transform:uppercase;margin:0 0 10px">Scope &amp; Deliverables</h2>
+  <table class="prop-table">
+    <thead><tr><th>Deliverable</th><th>Description</th></tr></thead>
+    <tbody>
+      <tr><td>Website lead capture</td><td>Form integration that triggers the AI conversation the instant a lead submits</td></tr>
+      <tr><td>AI SMS conversation</td><td>Natural-language qualification flow tuned to Aldergate's services, tone, and FAQs</td></tr>
+      <tr><td>Google Calendar booking</td><td>Live availability checks, slot offers, confirmation, and conflict prevention</td></tr>
+      <tr><td>Appointment confirmation</td><td>Automated SMS confirmation to the customer on booking</td></tr>
+      <tr><td>Admin dashboard</td><td>View leads and conversations, monitor bookings, edit AI instructions and business hours</td></tr>
+      <tr><td>Conversation history &amp; analytics</td><td>Response time, booking rate, missed opportunities, and after-hours volume</td></tr>
+      <tr><td>Launch support</td><td>Two weeks of live monitoring and conversation tuning after go-live</td></tr>
+    </tbody>
+  </table>
+  <p style="font-size:13px;color:var(--color-neutral-700)">Out of scope for this phase: voice AI, CRM integrations, email automation, payment collection, and technician dispatching — all available as future enhancements once the SMS system is live.</p>
+
+  <div class="hr" style="margin:28px 0"></div>
+
+  <h2 style="font-size:15px;letter-spacing:0.04em;text-transform:uppercase;margin:0 0 10px">Timeline</h2>
+  <table class="prop-table">
+    <thead><tr><th>Phase</th><th>Duration</th><th>Weeks</th></tr></thead>
+    <tbody>
+      <tr><td>Discovery &amp; conversation design</td><td>1 week</td><td>1</td></tr>
+      <tr><td>Build: SMS agent &amp; Calendar integration</td><td>2 weeks</td><td>2–3</td></tr>
+      <tr><td>Testing &amp; go-live</td><td>1 week</td><td>4</td></tr>
+      <tr><td>Live monitoring &amp; tuning</td><td>2 weeks</td><td>5–6</td></tr>
+    </tbody>
+  </table>
+
+  <div class="hr" style="margin:28px 0"></div>
+
+  <h2 style="font-size:15px;letter-spacing:0.04em;text-transform:uppercase;margin:0 0 10px">Budget</h2>
+  <table class="prop-table">
+    <thead><tr><th>Item</th><th>Fee</th></tr></thead>
+    <tbody>
+      <tr><td>Setup &amp; integration (one-time)</td><td>$5,500</td></tr>
+      <tr><td>Platform, SMS &amp; monitoring (monthly)</td><td>$750/mo</td></tr>
+    </tbody>
+    <tfoot><tr><td>First-month total</td><td>$6,250</td></tr></tfoot>
+  </table>
+  <p style="font-size:13px;color:var(--color-neutral-700)">Setup fee due on signing. Monthly fee begins at go-live and covers hosting, SMS volume up to 1,500 leads/month, Google Calendar sync, and ongoing conversation tuning. No long-term contract; 30 days' notice to cancel. Estimate valid for 30 days.</p>
+
+  <div class="hr" style="margin:28px 0"></div>
+
+  <div style="display:flex;justify-content:space-between;align-items:center">
+    <p style="margin:0">To move forward, reply to confirm and we'll schedule a kickoff for the week of your choice.</p>
+    <div style="font-family:var(--font-heading);font-weight:700;font-size:13px;letter-spacing:0.04em;color:var(--color-accent-700)">Fieldwork Studio</div>
+  </div>
+
+</doc-page>
+
+</x-dc>
+</body>
+</html>

@@ -6,10 +6,13 @@ calls, and places the user had to correct my approach.
 Newest first. Each entry records what happened, why, the fix, and the rule that
 would have prevented it.
 
-Three patterns run through this session and are worth reading as groups rather
-than as isolated incidents: **secrets leaked by printing unmasked output**,
-**suppressed output making a failure look like a success**, and **treating a
-recurring symptom as flakiness instead of finding its cause**.
+Three patterns run through this session and are worth reading as groups ratherthan as isolated incidents: 
+
+**secrets leaked by printing unmasked output**,
+
+**suppressed output making a failure look like a success**, 
+and 
+**treating arecurring symptom as flakiness instead of finding its cause**.
 
 ---
 
