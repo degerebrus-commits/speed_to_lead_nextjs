@@ -152,7 +152,7 @@ const baseSchema = z.object({
   TWILIO_WEBHOOK_URL: optional(z.string().url()),
 
   /** The Twilio number messages are sent from, in E.164. */
-  TWILIO_FROM_NUMBER: optional(z.string().regex(/^[+][1-9]d{7,14}$/, "must be E.164")),
+  TWILIO_FROM_NUMBER: optional(z.string().regex(/^\+[1-9]\d{7,14}$/, "must be E.164")),
 
   // Required only when SMS_PROVIDER=textbee - see the refinement below.
   TEXTBEE_API_KEY: optional(z.string().min(1)),
