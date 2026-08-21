@@ -218,8 +218,17 @@ const baseSchema = z.object({
   SMS_EMERGENCY_TEMPLATE: z.string().min(1).default(
     "Thanks for letting us know - treating this as urgent. {repName} from {businessName} will call you right away.",
   ),
+  /** How long before a visit the reminder goes out. */
+  APPOINTMENT_REMINDER_MINUTES: z.coerce.number().int().positive().max(1440).default(60),
+  /**
+   * The reminder. Carries CANCEL because this is the customer's last chance to
+   * call the visit off before somebody drives to them.
+   */
+  SMS_REMINDER_TEMPLATE: z.string().min(1).default(
+    "Reminder: {businessName} is visiting you at {time}. Reply CANCEL if you no longer need us.",
+  ),
   SMS_BOOKING_CONFIRMATION_TEMPLATE: z.string().min(1).default(
-    "You're all set! Your appointment with {businessName} is confirmed for {time}. Reply STOP to opt out.",
+    "You're all set! {businessName} is booked for {time}. Reply CANCEL to cancel or change it, or STOP to opt out.",
   ),
   /**
    * Sent to OWNER_PHONE when an emergency is detected. Goes to the business

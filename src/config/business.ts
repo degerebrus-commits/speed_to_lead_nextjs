@@ -57,6 +57,7 @@ export interface MessageTemplates {
   ownerAlert: string;
   cancellation: string;
   nothingToCancel: string;
+  reminder: string;
 }
 
 export interface BookingSettings {
@@ -99,6 +100,7 @@ export function getMessageTemplates(): MessageTemplates {
     ownerAlert: env.SMS_OWNER_ALERT_TEMPLATE,
     cancellation: env.SMS_CANCELLATION_TEMPLATE,
     nothingToCancel: env.SMS_NOTHING_TO_CANCEL_TEMPLATE,
+    reminder: env.SMS_REMINDER_TEMPLATE,
   };
 }
 
