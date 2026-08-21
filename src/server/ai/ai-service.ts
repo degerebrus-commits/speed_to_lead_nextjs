@@ -14,7 +14,7 @@ export function setAiProviderForTesting(provider: AiProvider | null): void {
   providerOverride = provider;
 }
 
-export function getAiProvider(): AiProvider {
+function getAiProvider(): AiProvider {
   if (providerOverride) return providerOverride;
 
   // Belt and braces against a test run spending real tokens. Specs install a
@@ -35,7 +35,7 @@ export function getAiProvider(): AiProvider {
  * Direction is the mapping: what we sent is the assistant's turn, what the
  * customer sent is the user's.
  */
-export function toChatHistory(messages: Message[]): ChatMessage[] {
+function toChatHistory(messages: Message[]): ChatMessage[] {
   return messages.map((message) => ({
     role: message.direction === "OUTBOUND" ? ("assistant" as const) : ("user" as const),
     content: message.body,
@@ -47,7 +47,7 @@ export function toChatHistory(messages: Message[]): ChatMessage[] {
  * possible. A model told to be brief usually is; this is the backstop for when
  * it is not.
  */
-export function trimToSmsLength(text: string, maxLength: number = getEnv().SMS_MAX_LENGTH): string {
+function trimToSmsLength(text: string, maxLength: number = getEnv().SMS_MAX_LENGTH): string {
   const collapsed = text.replace(/\s+/g, " ").trim();
   if (collapsed.length <= maxLength) return collapsed;
 

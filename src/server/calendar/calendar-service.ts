@@ -182,7 +182,7 @@ export function overlapsBusy(start: Date, end: Date, busy: BusyInterval[]): bool
  * is wrong. The address goes in `location` so the calendar app offers
  * navigation rather than making them copy it out of a description.
  */
-export function buildEventFields(lead: Lead, appointment: Appointment) {
+function buildEventFields(lead: Lead, appointment: Appointment) {
   const business = getBusinessProfile();
   const firstName = lead.name.trim().split(/\s+/)[0] || lead.name;
 

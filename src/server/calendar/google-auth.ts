@@ -51,7 +51,7 @@ function base64url(input: string | Buffer): string {
  * literal backslash-n sequences. Left unconverted the signature fails with an
  * error that says nothing useful about why.
  */
-export function decodePrivateKey(raw: string): string {
+function decodePrivateKey(raw: string): string {
   return raw.includes("-----BEGIN") ? raw.replace(/\\n/g, "\n") : raw;
 }
 

@@ -18,7 +18,7 @@ export function setSmsProviderForTesting(provider: SmsProvider | null): void {
   providerOverride = provider;
 }
 
-export function getSmsProvider(): SmsProvider {
+function getSmsProvider(): SmsProvider {
   if (providerOverride) return providerOverride;
 
   const { SMS_PROVIDER } = getEnv();

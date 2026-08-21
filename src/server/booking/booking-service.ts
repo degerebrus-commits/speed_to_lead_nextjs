@@ -42,7 +42,7 @@ const BOOKING_INTENT_PHRASES = [
  * Slot identity for the unique constraint. Fixed-slot mode has no real
  * timestamps, so the label itself is the resource being contended for.
  */
-export function buildSlotKey(slotLabel: string): string {
+function buildSlotKey(slotLabel: string): string {
   return slotLabel.trim().toLowerCase().replace(/\s+/g, " ");
 }
 

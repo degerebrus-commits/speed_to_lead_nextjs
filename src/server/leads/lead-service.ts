@@ -10,7 +10,7 @@ import type { LeadWebhookInput } from "@/lib/validation/lead-schema";
  * same lead. Derived from the normalised phone so formatting differences in
  * the website form cannot produce two keys for one submission.
  */
-export function buildDedupeKey(normalizedPhone: string, message: string): string {
+function buildDedupeKey(normalizedPhone: string, message: string): string {
   return createHash("sha256").update(`${normalizedPhone}:${message.trim()}`).digest("hex");
 }
 
