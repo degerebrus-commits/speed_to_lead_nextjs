@@ -22,6 +22,7 @@ import {
   detectAppointmentIntent,
   findActiveAppointment,
 } from "@/server/booking/appointment-changes";
+import { checkCoverage } from "@/server/booking/service-area";
 import { detectEmergency } from "@/server/sms/emergency-detection";
 import { renderTemplate } from "@/server/sms/sms-templates";
 import { sendConversationSms, sendOwnerEmergencyAlert } from "@/server/sms/sms-service";
@@ -310,6 +311,40 @@ export async function handleCustomerReply(
       matchSlotChoice(inboundBody, openCandidates, false);
 
     if (chosen) {
+      // Coverage is checked here, in code, and not by the model.
+      //
+      // The service area reached the assistant only as prose in the system
+      // prompt, so whether an address qualified was a judgement a customer
+      // could argue with - and a model asked nicely enough makes an exception
+      // the business never agreed to. This runs before anything is written, so
+      // an out-of-area customer is never told a technician is coming.
+      //
+      // "not decided" (no list configured) deliberately does not block: a
+      // deployment that has not set the list should keep taking bookings, and
+      // the alternative is refusing every customer until someone notices.
+      const coverage = checkCoverage(lead.serviceAddress);
+
+      if (coverage === "outside") {
+        const business = getBusinessProfile();
+        const reply = business.serviceArea
+          ? `That address is outside the area we cover (${business.serviceArea}), so I can't book a visit there. I've passed this to the team - someone will call you to confirm.`
+          : `That address is outside the area we cover, so I can't book a visit there. I've passed this to the team - someone will call you to confirm.`;
+
+        await prisma.lead.update({
+          where: { id: lead.id },
+          data: { status: "HUMAN_HANDOFF" },
+        });
+
+        await sendConversationSms(lead, reply);
+
+        logger.warn("Booking refused: address outside the service area", {
+          leadId: lead.id,
+          slotKey: chosen.key,
+        });
+
+        return { kind: "handoff", reply, escalated: true };
+      }
+
       const booking = await bookSlot(lead, chosen);
 
       if (booking.appointment && booking.confirmation) {

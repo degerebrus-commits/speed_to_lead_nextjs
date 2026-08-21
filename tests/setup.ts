@@ -46,6 +46,11 @@ process.env.LEAD_WEBHOOK_SECRET = "test-webhook-secret-0123456789";
 process.env.BUSINESS_NAME = "Northwind Heating & Air";
 process.env.BUSINESS_COUNTRY_CODE = "+1";
 process.env.SMS_PROVIDER = "console";
+// Coverage is deployment-specific and must not leak into the suite. Empty
+// means "not decided", which does not block a booking - so every existing
+// spec keeps testing what it was written to test, and the specs that care
+// about coverage set it themselves.
+process.env.SERVICE_AREA_CITIES = "";
 process.env.TEXTBEE_WEBHOOK_SECRET = "test-webhook-signing-secret-0123456789";
 process.env.RATE_LIMIT_MAX_REQUESTS = "1000";
 process.env.RATE_LIMIT_WINDOW_MS = "60000";

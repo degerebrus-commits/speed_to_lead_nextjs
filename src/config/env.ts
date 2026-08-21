@@ -198,6 +198,16 @@ const baseSchema = z.object({
    * failed its own rule and a deployment that had not set it could not start.
    */
   SERVICE_AREA: z.string().default(""),
+
+  /**
+   * Municipalities or towns the business will travel to, comma separated.
+   *
+   * This is what decides coverage, in code. SERVICE_AREA above is prose for
+   * the customer to read; this is the list the booking check matches against.
+   * Empty means coverage cannot be decided, and an address outside it is
+   * handed to a person rather than accepted or refused automatically.
+   */
+  SERVICE_AREA_CITIES: z.string().default(""),
   /** Alerted when a conversation is escalated. */
   OWNER_PHONE: optional(z.string().regex(/^\+[1-9]\d{7,14}$/, "must be E.164")),
 
