@@ -30,7 +30,8 @@
 - Typecheck clean.
 
 ## Never
-- Never print raw API responses or log lines that may carry secrets. Select fields by name.
+- Never print output you have not read first — API responses, log lines, URLs. Select fields by name. Credentials hide in paths and query strings, not just JSON bodies: the fifth leak here was a secret in a webhook path, grepped out of a log.
+- Never use `z.coerce.boolean()` on an env var. `Boolean("false")` is `true`, so the flag can never be off. Use `z.enum(["true","false"])`, and always test the flag turned off.
 - Never commit `.env` or `.env.backup*`.
 - Never `2>/dev/null` on anything whose failure you would act on.
 - Never let a model decide whether an appointment happened. Code executes; the model talks.
@@ -57,5 +58,6 @@
 - Per-client config: `src/config/business.ts`. Nothing customer-facing is hardcoded elsewhere.
 - Keep new components small; split past ~250 lines. Existing service and config files exceed this and are not a precedent.
 - Read `STATUS.md` and `MISTAKES.md` at session start.
-- Record every new bug class in `MISTAKES.md` with the rule that prevents it — after the bug, not at session end.
+- **After every bug, before moving on: write the rule that prevents it into this file, and the story into `MISTAKES.md`.** Not at session end — the tail of a long session is where the recording stops and the mistakes don't.
+- One terse line here per bug *class*, not per bug. A repeat of something already listed means the existing line was wrong, so fix that line rather than adding another. This file guards nothing if it grows past being read.
 - A2P registration and SMS provider accounts belong to the client. Not project status.

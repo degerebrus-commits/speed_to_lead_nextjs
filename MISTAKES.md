@@ -478,3 +478,62 @@ not merely its shape - unique ids stay unique, monotonic clocks stay monotonic.
 And when a test passes alone but fails in the suite, read the error before
 forming a theory: "my new feature broke it" is a hypothesis, and the exception
 text was naming a different culprit the whole time.
+
+---
+
+## Leaked a fifth secret, and the fourth one's rule did not fire
+
+**What happened.** Checking that inbound webhooks were arriving, I grepped the
+dev server log for `POST /api/webhooks/sms-gate` and printed the matching lines.
+The secret is a path segment in that URL, so it went straight into the
+transcript - one day after recording the fourth leak and writing "never print
+raw API responses" as its prevention rule.
+
+**Root cause.** The rule named the wrong thing. The danger was never "API
+responses" specifically; it is any output not read before being displayed. A log
+line is not an API response, so the rule did not fire.
+
+**The correct fix.** Rotated the secret, re-registered the webhook, restarted.
+CLAUDE.md's line now covers logs and URLs, and says credentials hide in paths.
+
+**Prevention rule.** When the same class of mistake repeats, the existing rule is
+wrong - rewrite it rather than adding another beside it.
+
+---
+
+## Reported success over a failing compiler
+
+**What happened.** Ran `tsc --noEmit 2>&1 | head -4 && echo "typecheck clean"`
+and reported it clean. It was not: the error was in the output I had just
+printed. `head` exited 0, so `&&` fired regardless of what `tsc` returned.
+
+**Root cause.** The exit code tested belonged to the last command in the
+pipeline, not the one whose result mattered. Same class as `2>/dev/null` on a
+command whose failure you intend to act on.
+
+**The correct fix.** `tsc --noEmit; echo "exit: $?"` and read the number. The
+error was a fixture missing a new field, fixed in a minute once seen.
+
+**Prevention rule.** Never chain a success message off a filtered pipeline. Run
+the command bare and print `$?`. "It printed no errors" and "it succeeded" are
+different claims.
+
+---
+
+## z.coerce.boolean() cannot express false
+
+**What happened.** `QUIET_HOURS_ENABLED: z.coerce.boolean().default(true)`.
+Setting it to `"false"` left the feature on: `Boolean("false")` is `true`, and
+every non-empty string coerces the same way. The off switch could not turn
+anything off.
+
+**Root cause.** Reached for `z.coerce` by analogy with `z.coerce.number()`, which
+behaves sensibly. The codebase already had the right pattern three lines away:
+`AFTER_HOURS_REPLY_ENABLED: z.enum(["true", "false"])`.
+
+**The correct fix.** The enum, compared as a string. A test asserting the
+disabled case caught it before it shipped.
+
+**Prevention rule.** Never `z.coerce.boolean()` on an env var - environment
+values are strings, and only `""` is falsy. Always write the test that exercises
+a flag turned off; a flag with no off-test has never been off.
