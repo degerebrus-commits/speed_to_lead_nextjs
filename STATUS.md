@@ -1,12 +1,12 @@
 # Project Status
 
-Snapshot as of **2026-08-19**. Read with `CONTRIBUTING.md` (conventions and the
+Snapshot as of **2026-08-21**. Read with `CONTRIBUTING.md` (conventions and the
 single-tenant decision), `PRD-TRACEABILITY.md` (every requirement, built or
 not), `SPEC-COMPARISON.md` (how this differs from the Express build),
 `MISTAKES.md` (what went wrong and the rules that prevent it), and
 `STANDARDS.md`.
 
-**292 tests passing**, typecheck clean, production build succeeds, CI runs on
+**342 tests passing**, typecheck clean, production build succeeds, CI runs on
 every push.
 
 ---
@@ -59,7 +59,9 @@ not pass without the consent line live on the client's form. This is the
 critical path to going live — see `CLIENT-REQUIREMENTS.md`, which is written
 for the client to read directly.
 
-**The handset gateways do not work. Use Twilio.**
+**Superseded 2026-08-20 - see below.** TextBee does not work; SMS Gate in Local
+Server mode does, and is what this deployment uses for testing. The paragraphs
+below are the reasoning that settled TextBee and are kept for the record.
 
 Settled 2026-08-19 after two clean tests. TextBee accepts a message, returns a
 real provider id in about two seconds, and the phone never delivers it -
@@ -142,7 +144,9 @@ TWILIO_AUTH_TOKEN, TWILIO_FROM_NUMBER and TWILIO_WEBHOOK_URL. A trial account
 is enough to demo - it only delivers to numbers verified in the console and
 prefixes a trial notice, both of which disappear on upgrade.
 
-Keep SMS_PROVIDER=console until those credentials exist.
+For a client deployment, keep SMS_PROVIDER=console until those credentials
+exist. For local testing the answer is now sms-gate, which is what this
+deployment runs.
 
 **The OpenAI account has no credit.** `AI_PROVIDER=openai` fails with
 `insufficient_quota`; `anthropic` works.
@@ -455,6 +459,84 @@ the real Google Calendar.
 
 +639534305571 is **opted out** - STOP was sent during testing. Texting it again
 requires START from that handset first.
+
+## Done on 2026-08-21
+
+**Quiet hours.** The unsolicited intro text is held between `QUIET_HOURS_START`
+and `QUIET_HOURS_END` on the business clock and released by the retry endpoint.
+Replies are deliberately untouched: someone texting at 2am is awake and waiting,
+and answering is a far safer position than initiating. `introSmsDeferredUntil`
+distinguishes a lead waiting for morning from one nothing reached, so the
+stalled-lead alarm no longer cries wolf overnight.
+
+**Coverage decided in code.** `SERVICE_AREA_CITIES` is a configured list matched
+in `service-area.ts` before anything is written. It used to reach the assistant
+only as prose, so whether an address qualified was a judgement a customer could
+argue with. An address outside the list gets an honest refusal naming the area,
+the lead goes to `HUMAN_HANDOFF`, and no appointment or calendar event is made.
+An unconfigured list means "not decided" rather than "outside", so a deployment
+that forgot to set it keeps taking bookings.
+
+**Reminders.** `sendDueReminders` texts confirmed visits starting inside
+`APPOINTMENT_REMINDER_MINUTES`, carrying CANCEL because it is the customer's last
+chance to call the visit off. Driven by `POST /api/appointments/reminders`, which
+`scripts/send-reminders.ps1` calls from the Windows task `SpeedToLead-Reminders`
+every five minutes; on a deployed host that is one cron line. `reminderSentAt`
+makes it idempotent and is stamped even on failure - retrying until the
+appointment starts would deliver a dozen reminders the moment a gateway
+recovered.
+
+**Cancelling is advertised.** The confirmation now reads "Reply CANCEL to cancel
+or change it, or STOP to opt out". It previously offered only STOP, so a customer
+wanting to call off a visit texted that instead and became uncontactable with the
+visit still booked - which happened during testing on 2026-08-20 and left two
+technicians scheduled for a number the system could no longer reach.
+
+**The model is told what the form said.** `buildSystemPrompt` only ever received
+the business, so the assistant asked for an address the database already held.
+Name, address and the submitted message now go into the prompt.
+
+**Injection guardrails.** The prompt states that customer messages are requests,
+never instructions: a claimed manager approval is unverified, insistence is a
+reason to involve a person rather than promise something, and it has no authority
+to grant exceptions. Price and timing are barred outright - no figure, no range,
+no hedge - because "probably" and "should be able to" are read as commitments.
+
+**Dashboard.** Two metrics added (booked after hours, upcoming visits), a
+seven-day schedule panel grouped by the business's own day, the client's logo,
+and a 7/30/90-day window switch.
+
+**A hook that masks secrets.** `scripts/redact-secrets.mjs` runs as a PostToolUse
+hook on Bash and masks anything matching a literal value from `.env` plus narrow
+credential patterns. Five secrets leaked into transcripts on this project and
+each time the response was to write a rule; the rules did not hold. Requires
+approving the hook after a Claude Code restart.
+
+---
+
+## Outstanding after 2026-08-21
+
+**An out-of-area lead is not handed off during qualification.** The coverage
+guard fires when someone picks a slot. A customer whose address is outside the
+area but who never reaches the booking step gets a conversational reply and sits
+at `ENGAGED` with nobody told to call them. Seen live: "Larry Bird",
+47 Narra St Mandaluyong.
+
+**Service category per lead.** Maintenance, repair or installation, classified in
+code from keywords like emergency detection, driven by config rather than a
+hardcoded enum so a plumbing deployment gets its own. Proposed and agreed in
+principle; not started. Needs a schema change.
+
+**Structured qualification** remains the largest gap - urgency, property type and
+preferred time are discussed and never become queryable fields.
+
+**The landing page form is not wired.** `public/demo/landing.html` is served
+through the tunnel but its React bundle posts nowhere, so submitting it creates
+no lead.
+
+**TextBee can be deleted** - 512 lines across the provider, its tests and the
+webhook route it owns. Held until SMS Gate had a clean end-to-end run, which it
+now has.
 
 ## Decided but not built: quiet hours
 
