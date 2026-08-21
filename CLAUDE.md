@@ -1,52 +1,43 @@
-# Project Constraints & Guardrails
+# CLAUDE.md
 
-## Critical Action Checklist
+## Stack
+- Use npm, not pnpm or yarn.
+- TypeScript strict mode. No `any`.
+- Next 15 App Router, Prisma, Postgres in Docker. One stylesheet, no framework.
+- Single-tenant: one deployment per client. See PROJECT.md 25.
 
-Before executing any of these, pause and think through consequences:
+## Definition of done
+- Tests run and the output is in the reply (`npm test`). "Should work" is not done.
+- Typecheck clean — gate on the exit code, never a filtered pipeline. `tsc | head` then `echo clean` lies.
+- New behaviour has a test that was confirmed to fail against the unfixed code.
+- No new lint warnings.
 
-- Deleting or modifying existing data (leads, appointments, calendar events)
-- Writing to external systems (Google Calendar, SMS providers, customer-facing APIs)
-- Changing authentication or permission logic
-- Committing code that changes customer-visible behavior
-- Rotating secrets or credentials
+## Never
+- Never print raw API responses or log lines that may carry secrets. Select fields by name.
+- Never commit `.env` or `.env.backup*`.
+- Never `2>/dev/null` on anything whose failure you would act on.
+- Never let a model decide whether an appointment happened. Code executes; the model talks.
 
-For each one:
+## Ask first
+- Deleting or modifying leads, appointments, or calendar events.
+- Writing to Google Calendar, sending SMS, or anything a customer sees.
+- Schema changes, auth changes, rotating secrets.
+- Anything over about an hour: propose the plan, wait for yes. Correcting a plan costs a paragraph.
 
-1. **State what you're about to do** — exact operation, not a summary
-2. **Explain why** — the business reason or the problem it solves
-3. **Ask before proceeding** — even if the code is obviously correct
+## Debugging
+- Ask before inferring. A person did it is the first hypothesis, not a second system.
+- Read the exception before forming a theory.
+- A test that passes alone and fails in the suite is isolation, not the new feature.
+- A recurring symptom is an unexamined cause, not flakiness.
 
-Never assume. Never infer. Never optimize around the question.
+## Environment traps
+- Start Docker Desktop first. It does not survive a reboot here.
+- `docker compose up -d` returns before Postgres accepts connections. Gate on `pg_isready`.
+- Tests use a separate `_test` database. Apply migrations to both.
+- `prisma migrate` fails with EPERM while the dev server holds the query engine. Stop it first.
 
-## Secret Handling
-
-- Never print raw API responses, even partially. Select fields by name before displaying.
-- Never log or echo credentials, tokens, or signing secrets.
-- Rotate credentials immediately if leaked, and document in MISTAKES.md.
-- Use `<redacted>`, `<set>`, or `<not printed>` when referring to sensitive values in output.
-
-## Debugging Before Building
-
-When something is unexplained (a message from an unknown source, unexpected state, an ambiguous error):
-
-- Ask first. Infer second.
-- Human action is the first hypothesis; rule it out by asking before concluding a second system exists.
-- Typos and inconsistencies are tells of human authorship.
-
-## Testing Against Real Systems
-
-When a test uses real external systems (Google Calendar, SMS gateways):
-
-- Document why the test isolation exists
-- Verify isolation with an explicit assertion (confirm the real system was NOT reached)
-- Record any found gaps in MISTAKES.md with the prevention rule
-
-## Out of scope: the client's paperwork
-
-A2P 10DLC registration and the SMS provider account belong to whichever client
-the deployment is sold to, filed under their business. They are not project
-tasks, not blockers on this codebase, and do not belong in status reports,
-outstanding lists, or "what's next" summaries.
-
-Mention them only when asked directly, or when a code decision genuinely turns
-on one.
+## Conventions
+- Per-client config: `src/config/business.ts`. Nothing customer-facing is hardcoded elsewhere.
+- Read `STATUS.md` and `MISTAKES.md` at session start.
+- Record every new bug class in `MISTAKES.md` with the rule that prevents it.
+- A2P registration and SMS provider accounts belong to the client. Not project status.
