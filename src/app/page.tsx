@@ -28,11 +28,36 @@ function Metric({
   );
 }
 
-export default async function DashboardPage() {
+/**
+ * Windows the owner can switch between.
+ *
+ * A fixed list rather than any number from the query string: the figures are
+ * cheap but not free, and an arbitrary `?days=100000` would scan the whole
+ * table on a page anyone with the password can load.
+ */
+const WINDOWS = [
+  { days: 7, label: "7 days" },
+  { days: 30, label: "30 days" },
+  { days: 90, label: "90 days" },
+] as const;
+
+const DEFAULT_WINDOW = 30;
+
+export default async function DashboardPage({
+  searchParams,
+}: {
+  searchParams: Promise<{ days?: string }>;
+}) {
   await requireSession();
 
+  const params = await searchParams;
+  const requested = Number.parseInt(params.days ?? "", 10);
+  // An unrecognised value falls back rather than erroring. A hand-edited query
+  // string is not worth a failure screen.
+  const windowDays = WINDOWS.some((w) => w.days === requested) ? requested : DEFAULT_WINDOW;
+
   const [metrics, stalled, schedule] = await Promise.all([
-    getDashboardMetrics(),
+    getDashboardMetrics(windowDays),
     getStalledLeads(),
     getSchedule(),
   ]);
@@ -62,6 +87,18 @@ export default async function DashboardPage() {
           <p className="subtitle">
             Last {metrics.windowDays} days, since {formatDateTime(metrics.windowStart)}.
           </p>
+
+          <div className="filters">
+            {WINDOWS.map((option) => (
+              <Link
+                key={option.days}
+                href={option.days === DEFAULT_WINDOW ? "/" : `/?days=${option.days}`}
+                aria-current={option.days === windowDays}
+              >
+                {option.label}
+              </Link>
+            ))}
+          </div>
         </div>
       </div>
 
