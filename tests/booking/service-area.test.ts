@@ -75,3 +75,33 @@ describe("checkCoverage", () => {
     expect(checkCoverage("1 Main St, Taguig")).toBe("outside");
   });
 });
+
+describe("US addresses", () => {
+  // The product is sold to US businesses; the Philippine list is only what
+  // this deployment happens to be testing with. Nothing in the matcher knows
+  // which country it is looking at.
+  beforeEach(() => covering("Kansas City,Salt Lake City,Austin,St. Louis"));
+
+  it("matches a multi-word city in a full US address", () => {
+    expect(checkCoverage("1200 Main St, Kansas City, MO 64105")).toBe("inside");
+    expect(checkCoverage("55 W South Temple, Salt Lake City, UT 84101")).toBe("inside");
+  });
+
+  it("matches a single-word city", () => {
+    expect(checkCoverage("901 S Congress Ave, Austin, TX 78704")).toBe("inside");
+  });
+
+  it("ignores punctuation in the configured name", () => {
+    // "St. Louis" in config, "St Louis" as typed, or the other way round.
+    expect(checkCoverage("100 N Broadway, St Louis, MO 63102")).toBe("inside");
+  });
+
+  it("refuses a city that is not on the list", () => {
+    expect(checkCoverage("400 Main St, Dallas, TX 75201")).toBe("outside");
+  });
+
+  it("does not match a city name that is only part of the street", () => {
+    // "Austin Street" in Houston is not Austin.
+    expect(checkCoverage("14 Austintown Road, Youngstown, OH")).toBe("outside");
+  });
+});
