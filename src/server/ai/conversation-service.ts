@@ -382,7 +382,11 @@ export async function handleCustomerReply(
     orderBy: { createdAt: "asc" },
   });
 
-  const { reply, provider, model } = await generateQualificationReply(history);
+  const { reply, provider, model } = await generateQualificationReply(history, {
+      name: lead.name,
+      serviceAddress: lead.serviceAddress,
+      initialMessage: lead.initialMessage,
+    });
 
   await sendConversationSms(lead, reply);
 

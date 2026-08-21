@@ -17,10 +17,35 @@ import type { BusinessProfile } from "@/config/business";
  * booking all live in application code. The prompt describes behaviour; it is
  * not the enforcement mechanism (STANDARDS.md 2.3).
  */
-export function buildSystemPrompt(business: BusinessProfile): string {
+/** What the customer supplied on the form, so the assistant never re-asks it. */
+export interface KnownLeadFacts {
+  name?: string | null;
+  serviceAddress?: string | null;
+  initialMessage?: string | null;
+}
+
+export function buildSystemPrompt(
+  business: BusinessProfile,
+  lead?: KnownLeadFacts,
+): string {
   const hasServiceArea = business.serviceArea.length > 0;
   const hasServiceTypes = business.serviceTypes.length > 0;
   const hasHazards = business.safetyHazards.length > 0;
+
+  // The prompt already said "if the customer has not already given one", but
+  // the lead was never passed in - so the model had no way to know one had
+  // been, and asked for an address that was sitting in the database.
+  const trimmed = (value: string | null | undefined) => (value ?? "").trim();
+
+  const known = [
+    trimmed(lead?.name) ? `- Their name: ${trimmed(lead?.name)}` : null,
+    trimmed(lead?.serviceAddress)
+      ? `- Service address: ${trimmed(lead?.serviceAddress)}`
+      : null,
+    trimmed(lead?.initialMessage)
+      ? `- What they wrote: "${trimmed(lead?.initialMessage)}"`
+      : null,
+  ].filter((line): line is string => line !== null);
 
   const lines: string[] = [
     `You are ${business.repName}, a scheduling assistant for ${business.name}, a ${business.vertical} company.`,
@@ -42,6 +67,15 @@ export function buildSystemPrompt(business: BusinessProfile): string {
     `- How urgent it is`,
     `- Whether it is a home or a business`,
     `- The service address, if the customer has not already given one`,
+    ...(known.length > 0
+      ? [
+          ``,
+          `WHAT THE CUSTOMER ALREADY TOLD YOU ON THE FORM`,
+          ...known,
+          `Do not ask for any of the above again. Asking a customer to repeat what`,
+          `they just typed reads as though nobody looked at their request.`,
+        ]
+      : []),
     `Ask ONE question at a time. This is a text conversation, not a form.`,
     ``,
     `HOW TO WRITE`,

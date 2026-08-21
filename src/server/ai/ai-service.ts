@@ -5,7 +5,7 @@ import { logger } from "@/lib/logger";
 import type { AiProvider, ChatMessage } from "./ai-provider";
 import { createAnthropicProvider } from "./anthropic-provider";
 import { AiProviderError, createOpenAiProvider } from "./openai-provider";
-import { buildSystemPrompt } from "./system-prompt";
+import { buildSystemPrompt, type KnownLeadFacts } from "./system-prompt";
 
 let providerOverride: AiProvider | null = null;
 
@@ -81,6 +81,7 @@ export interface QualificationResult {
  */
 export async function generateQualificationReply(
   history: Message[],
+  lead?: KnownLeadFacts,
 ): Promise<QualificationResult> {
   const business = getBusinessProfile();
   const provider = getAiProvider();
@@ -89,7 +90,7 @@ export async function generateQualificationReply(
   const recent = history.slice(-env.AI_HISTORY_LIMIT);
 
   const messages: ChatMessage[] = [
-    { role: "system", content: buildSystemPrompt(business) },
+    { role: "system", content: buildSystemPrompt(business, lead) },
     ...toChatHistory(recent),
   ];
 
