@@ -1,5 +1,8 @@
 import { describe, expect, it } from "vitest";
 
+// The redactor is plain .mjs with no declarations - it runs as a hook, not
+// as part of the app build, so it is imported untyped here on purpose.
+// @ts-expect-error - no type declarations for a hook script
 import { redact } from "../../scripts/redact-secrets.mjs";
 
 /**
@@ -71,8 +74,8 @@ describe("redact", () => {
 
   it("handles empty and non-string input without throwing", () => {
     expect(redact("").hits).toBe(0);
-    // @ts-expect-error - deliberately wrong, because a hook payload may not
-    // carry a string and the redactor must not take the session down.
+    // Deliberately wrong input: a hook payload may not carry a string, and
+    // the redactor must not take the session down when it does not.
     expect(redact(undefined).hits).toBe(0);
   });
 });

@@ -51,6 +51,11 @@ process.env.SMS_PROVIDER = "console";
 // spec keeps testing what it was written to test, and the specs that care
 // about coverage set it themselves.
 process.env.SERVICE_AREA_CITIES = "";
+// Quiet hours off, or the suite depends on the wall clock: with the window at
+// 21:00-08:00 every spec that asserts an intro text was sent fails after 9pm
+// local and passes again in the morning. The specs that care about quiet hours
+// configure it themselves.
+process.env.QUIET_HOURS_ENABLED = "false";
 process.env.TEXTBEE_WEBHOOK_SECRET = "test-webhook-signing-secret-0123456789";
 process.env.RATE_LIMIT_MAX_REQUESTS = "1000";
 process.env.RATE_LIMIT_WINDOW_MS = "60000";

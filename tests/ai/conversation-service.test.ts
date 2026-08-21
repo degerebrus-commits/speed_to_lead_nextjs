@@ -1,3 +1,4 @@
+import { randomUUID } from "node:crypto";
 import { beforeEach, describe, expect, it } from "vitest";
 import { resetEnvCache } from "@/config/env";
 import { prisma } from "@/lib/db";
@@ -16,7 +17,7 @@ function installSpySms(): SmsMessage[] {
     name: "spy",
     async send(message) {
       sent.push(message);
-      return { providerMessageId: `spy-${sent.length}`, provider: "spy" };
+      return { providerMessageId: `spy-${randomUUID()}`, provider: "spy" };
     },
   };
 

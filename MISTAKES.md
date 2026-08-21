@@ -560,3 +560,31 @@ disabled case caught it before it shipped.
 **Prevention rule.** Never `z.coerce.boolean()` on an env var - environment
 values are strings, and only `""` is falsy. Always write the test that exercises
 a flag turned off; a flag with no off-test has never been off.
+
+---
+
+## Shipped a feature that made the suite depend on the wall clock
+
+**What happened.** Quiet hours suppress the intro text between 21:00 and 08:00.
+Nothing pinned that in `tests/setup.ts`, so from 9pm local every spec asserting
+an intro was sent failed - eleven of them - and would have passed again by
+morning. It landed green because it was written in the afternoon.
+
+**Root cause.** The feature reads the clock, and the suite inherited the
+deployment's configuration. This is the real-clock trap already recorded here,
+arriving from a new direction: not a test that reads the clock, but a *feature*
+that does, with the tests never told to hold it still.
+
+**And a second one in the same run.** Chasing it, I pushed a commit whose test
+step was `vitest ... | grep`. The grep exited 0, the `&&` fired, and eleven
+failing tests went to the remote - the same filtered-pipeline mistake recorded
+two entries ago, made while fixing something else.
+
+**The correct fix.** `tests/setup.ts` pins `QUIET_HOURS_ENABLED=false`, and the
+specs that care configure it themselves. The suite runner now captures vitest's
+exit code and exits with it, so nothing can chain off a filter.
+
+**Prevention rule.** When a feature reads the clock, the calendar or the
+environment, pin it in `tests/setup.ts` in the same change. Ask "what time does
+this suite think it is, and what happens at 3am" before calling it done.
+

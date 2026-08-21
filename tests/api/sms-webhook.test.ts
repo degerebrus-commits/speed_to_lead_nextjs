@@ -1,3 +1,4 @@
+import { randomUUID } from "node:crypto";
 import { createHmac } from "node:crypto";
 import { beforeEach, describe, expect, it } from "vitest";
 import { POST } from "@/app/api/webhooks/sms/route";
@@ -306,7 +307,7 @@ describe("POST /api/webhooks/sms", () => {
         name: "spy",
         async send(message) {
           sent.push(message);
-          return { providerMessageId: "spy-id", provider: "spy" };
+          return { providerMessageId: `spy-${randomUUID()}`, provider: "spy" };
         },
       };
       setSmsProviderForTesting(spy);

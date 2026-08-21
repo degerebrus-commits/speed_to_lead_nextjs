@@ -1,3 +1,4 @@
+import { randomUUID } from "node:crypto";
 import { beforeEach, describe, expect, it } from "vitest";
 import { POST } from "@/app/api/leads/webhook/route";
 import { getBusinessProfile, getMessageTemplates } from "@/config/business";
@@ -45,7 +46,7 @@ function installSpyProvider(): SmsMessage[] {
     name: "spy",
     async send(message) {
       sent.push(message);
-      return { providerMessageId: "spy-message-id", provider: "spy" };
+      return { providerMessageId: `spy-${randomUUID()}`, provider: "spy" };
     },
   };
 
