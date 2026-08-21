@@ -136,9 +136,32 @@ two escapes, leaving a sentence that read "`` became a vertical tab". The
 warning fired that time too, and I missed it twice in one day. Rewritten with a
 literal-text editor, which is what the rule below says to do.
 
+**And a third time, 2026-08-21.** `TWILIO_FROM_NUMBER` in the env schema
+carried `/^[+][1-9]d{7,14}$/` - a literal `d` where `\d` was meant. It demanded
+the letter d repeated seven to fourteen times and rejected every real phone
+number. Latent, because nobody had configured Twilio; the first client
+deployment would have refused to start against a number that plainly was E.164.
+`OWNER_PHONE` two lines below was written correctly, which is what made it
+visible - to a person reading the line, not to any tool.
+
 **Prevention rule.** A warning from the tool doing the work is evidence, not
-noise. And never build Windows paths in a language that interprets backslashes -
-use a literal-text editor, or the path will be wrong in a way that reads fine.
+noise.
+
+And never write a backslash-bearing literal through a layer that interprets
+backslashes. The earlier version of this rule said "Windows paths", which is why
+it did not fire for a regex - the class is **any** literal containing a
+backslash: escapes in a regex, escapes in a string, a Windows path.
+
+Use a literal-text editor - not a shell heredoc, not a scripting language.
+Then read the result back from the file.
+
+**And a fourth time, writing the paragraph above.** The heredoc ate the
+backslash out of the string example, leaving a real line break mid-sentence,
+and the interpreter printed `SyntaxWarning: invalid escape sequence` while it
+did. That is twice this single entry has been mangled by the exact bug it
+documents, and twice the warning fired and was read past. The examples are now
+written in prose rather than as literals, because a literal about escaping is a
+literal waiting to be eaten.
 
 ---
 

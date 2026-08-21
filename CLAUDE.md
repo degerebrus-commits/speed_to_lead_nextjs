@@ -31,6 +31,7 @@
 
 ## Never
 - Never print output you have not read first — API responses, log lines, URLs. Select fields by name. Credentials hide in paths and query strings, not just JSON bodies: the fifth leak here was a secret in a webhook path, grepped out of a log.
+- Never write a backslash-bearing literal — regex escapes, string escapes, Windows paths — through a shell heredoc or a scripting language. Use a literal-text editor, then read it back from the file. This has been got wrong four times here, twice while documenting itself.
 - Never use `z.coerce.boolean()` on an env var. `Boolean("false")` is `true`, so the flag can never be off. Use `z.enum(["true","false"])`, and always test the flag turned off.
 - Never commit `.env` or `.env.backup*`.
 - Never `2>/dev/null` on anything whose failure you would act on.
